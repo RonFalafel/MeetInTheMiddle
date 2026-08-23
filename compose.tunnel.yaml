@@ -1,0 +1,23 @@
+# Overlay for when cloudflared runs as a container rather than on the host.
+#
+#   docker compose -f compose.yaml -f compose.tunnel.yaml up -d
+#
+# It joins nginx to the network cloudflared is already on, so the tunnel can
+# reach it by container name and nothing has to be exposed on the LAN. The
+# ingress rule then points at http://meet-web:80 with no port involved.
+#
+# TUNNEL_NETWORK is whichever network cloudflared is attached to. Find it with:
+#   docker inspect -f '{{range $$k,$$v := .NetworkSettings.Networks}}{{$$k}} {{end}}' cloudflared
+#
+# The loopback port from compose.yaml stays published, which costs nothing and
+# keeps `curl localhost:8090` available for debugging on the host.
+services:
+  web:
+    networks:
+      - default
+      - tunnel
+
+networks:
+  tunnel:
+    external: true
+    name: ${TUNNEL_NETWORK:-bookshelf_default}

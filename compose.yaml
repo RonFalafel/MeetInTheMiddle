@@ -8,13 +8,16 @@ services:
     restart: unless-stopped
     depends_on:
       - sync
-    # Bound to loopback: the only way in is the Cloudflare tunnel, so the port
-    # is never exposed on the VM's public interface.
+    # Loopback by default, so the port is not exposed on any network interface
+    # and the Cloudflare tunnel is the only way in.
     #
-    # Override with MEET_PORT if something else on the host already has this
-    # one — the cloudflared ingress rule has to match whatever you pick.
+    # That only works when cloudflared runs on the host. If it runs as a
+    # container it cannot reach the host's loopback, and it needs either
+    # MEET_BIND=0.0.0.0 (reachable at the host's LAN address) or — better —
+    # the shared-network setup described in the README, which needs no
+    # published port at all.
     ports:
-      - '127.0.0.1:${MEET_PORT:-8090}:80'
+      - '${MEET_BIND:-127.0.0.1}:${MEET_PORT:-8090}:80'
 
   sync:
     build:

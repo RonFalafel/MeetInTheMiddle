@@ -132,28 +132,48 @@ already running on the VM.
 docker compose up -d --build
 ```
 
-Only nginx publishes a port, and only on loopback, so the tunnel is the only
-way in; the sync server is reachable solely over the compose network. Add the
-hostname to the cloudflared config:
+How the tunnel reaches it depends on where cloudflared runs.
 
-```yaml
-ingress:
-  - hostname: meet.ronfalafel.com
-    service: http://localhost:8090
-  - service: http_status:404
-```
+### cloudflared on the host
 
-The host port defaults to **8090** and is set by `MEET_PORT`, so if something
-else on the VM already has it, put `MEET_PORT=8123` in a `.env` file next to
-`compose.yaml` and point the ingress rule at the same number. Find what is
-holding a port with `sudo ss -ltnp | grep <port>`.
+The default. Nothing is published beyond loopback, so the tunnel is the only
+way in. Point the ingress rule at `http://localhost:8090`.
 
-Then point DNS at the tunnel once:
+### cloudflared in a container
+
+A container cannot reach the host's loopback, so the default bind gives a 502.
+Two ways round it, best first.
+
+**Share a Docker network — nothing exposed on the LAN.** Find the network
+cloudflared is attached to:
 
 ```bash
-cloudflared tunnel route dns <tunnel-name> meet.ronfalafel.com
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' cloudflared
 ```
 
-Cloudflare tunnels carry WebSockets without extra configuration. If cloudflared
-runs as a container rather than on the host, put it on the same compose network
-and use `http://web:80` instead of localhost.
+Put it in `.env` as `TUNNEL_NETWORK=<that name>`, then bring the stack up with
+the tunnel overlay:
+
+```bash
+docker compose -f compose.yaml -f compose.tunnel.yaml up -d
+```
+
+Point the ingress rule at `http://meet-web:80` — no port, no host address, and
+it keeps working if the VM's LAN address changes.
+
+The catch: that network belongs to whichever Compose project defined
+cloudflared, so tearing that project down takes this one's network with it. A
+dedicated network shared by cloudflared and everything it fronts is tidier if
+the collection keeps growing.
+
+**Or publish on all interfaces.** Put `MEET_BIND=0.0.0.0` in a `.env` file next
+to `compose.yaml` and point the ingress rule at the host's LAN address —
+`http://192.168.10.90:8090`. Simpler, and it matches how most self-hosted
+setups are wired, but the port is then reachable by anything on the LAN.
+
+Either way the port is set by `MEET_PORT`, default 8090; if something else has
+it, change it and change the ingress rule to match. Find what is holding a port
+with `sudo ss -ltnp | grep <port>`.
+
+Cloudflare tunnels carry WebSockets without extra configuration, so two-device
+games work over the tunnel with no additional setup.
