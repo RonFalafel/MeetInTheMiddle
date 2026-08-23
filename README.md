@@ -158,8 +158,20 @@ the tunnel overlay:
 docker compose -f compose.yaml -f compose.tunnel.yaml up -d
 ```
 
-Point the ingress rule at `http://meet-web:80` — no port, no host address, and
-it keeps working if the VM's LAN address changes.
+Point the ingress rule at `http://meet-web:80` — no host address, and it keeps
+working if the VM's LAN address changes.
+
+Note the **80**, not 8090. `MEET_PORT` is the port published on the host; over
+a shared Docker network you reach the container's own port, and nginx listens
+on 80 inside the container. Using the host port here is the easy mistake and
+gives a 502.
+
+Check it from another container on that network — cloudflared's own image is
+too minimal to have a shell client:
+
+```bash
+docker run --rm --network "$TUNNEL_NETWORK" nginx:1.27-alpine wget -qO- http://meet-web:80 | head -3
+```
 
 The catch: that network belongs to whichever Compose project defined
 cloudflared, so tearing that project down takes this one's network with it. A
