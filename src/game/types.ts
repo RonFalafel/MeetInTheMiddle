@@ -9,9 +9,13 @@ export type Country = {
   /** [longitude, latitude] — used to place labels and to draw microstates that are too small to see. */
   readonly centroid: readonly [number, number]
   readonly neighbours: readonly CountryCode[]
-}
-
-export type CountryGraph = {
-  readonly byCode: ReadonlyMap<CountryCode, Country>
-  readonly codes: readonly CountryCode[]
+  /**
+   * Which landmass this country belongs to, or null if it is out of play.
+   *
+   * Without ferry links the world is not one connected graph, so a game has to
+   * keep both starts on the same landmass. Islands with no land route anywhere
+   * get null: they still draw on the map, but they can never be a start and
+   * can never join a route.
+   */
+  readonly component: number | null
 }

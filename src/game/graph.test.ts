@@ -1,7 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { CODES, COUNTRY_LIST, areNeighbours, distance, findByName, getCountry, normalise, search, shortestPath } from './graph.ts'
-import { SEA_LINKS } from './seaLinks.ts'
+import {
+  CODES,
+  COUNTRY_LIST,
+  PLAYABLE_CODES,
+  areNeighbours,
+  distance,
+  findByName,
+  getCountry,
+  isPlayable,
+  normalise,
+  sameLandmass,
+  search,
+  shortestPath,
+} from './graph.ts'
+import { CARIBBEAN, FIXED_LINKS, PACIFIC, SEA_LINKS } from './seaLinks.ts'
 import { DISPUTED, EXCLUDED } from './playSet.ts'
+import { SETTINGS } from '../settings.ts'
+
+const landmasses = (): Map<number, string[]> => {
+  const groups = new Map<number, string[]>()
+  for (const country of COUNTRY_LIST) {
+    if (country.component === null) continue
+    const members = groups.get(country.component) ?? []
+    members.push(country.code)
+    groups.set(country.component, members)
+  }
+  return groups
+}
 
 describe('generated graph invariants', () => {
   it('has no duplicate codes', () => {
@@ -38,24 +63,6 @@ describe('generated graph invariants', () => {
     }
   })
 
-  it('leaves nobody stranded', () => {
-    for (const country of COUNTRY_LIST) expect(country.neighbours.length).toBeGreaterThan(0)
-  })
-
-  it('is fully connected, so every game is winnable', () => {
-    const seen = new Set([CODES[0]!])
-    const queue = [CODES[0]!]
-    for (let i = 0; i < queue.length; i++) {
-      for (const next of getCountry(queue[i]!).neighbours) {
-        if (!seen.has(next)) {
-          seen.add(next)
-          queue.push(next)
-        }
-      }
-    }
-    expect(seen.size).toBe(CODES.length)
-  })
-
   it('gives every country a plausible centroid', () => {
     for (const country of COUNTRY_LIST) {
       const [longitude, latitude] = country.centroid
@@ -67,22 +74,82 @@ describe('generated graph invariants', () => {
   })
 })
 
-describe('sea links', () => {
-  it('reference countries that are in play', () => {
-    const known = new Set(CODES)
-    for (const { a, b } of SEA_LINKS) {
-      expect(known.has(a), `${a} is not in play`).toBe(true)
-      expect(known.has(b), `${b} is not in play`).toBe(true)
+describe('landmasses', () => {
+  it('never strand a country that is in play', () => {
+    for (const code of PLAYABLE_CODES) {
+      expect(getCountry(code).neighbours.length, `${code} is in play but borders nothing`)
+        .toBeGreaterThan(0)
     }
   })
 
-  it('never link a country to itself', () => {
-    for (const { a, b } of SEA_LINKS) expect(a).not.toBe(b)
+  it('keep neighbours on the same landmass', () => {
+    for (const country of COUNTRY_LIST) {
+      for (const neighbour of country.neighbours) {
+        expect(getCountry(neighbour).component).toBe(country.component)
+      }
+    }
   })
 
-  it('are not listed twice', () => {
+  it('are each internally connected', () => {
+    for (const [index, members] of landmasses()) {
+      const seen = new Set([members[0]!])
+      const queue = [members[0]!]
+      for (let i = 0; i < queue.length; i++) {
+        for (const next of getCountry(queue[i]!).neighbours) {
+          if (!seen.has(next)) {
+            seen.add(next)
+            queue.push(next)
+          }
+        }
+      }
+      expect(seen.size, `landmass ${index} is in pieces`).toBe(members.length)
+    }
+  })
+
+  it('are each big enough to host a game, so no start pair is ever unwinnable', () => {
+    for (const [index, members] of landmasses()) {
+      const furthest = Math.max(
+        ...members.map((from) => Math.max(...members.map((to) => distance(from, to)))),
+      )
+      expect(furthest, `landmass ${index} cannot host a ${SETTINGS.minHops}-hop game`)
+        .toBeGreaterThanOrEqual(SETTINGS.minHops)
+    }
+  })
+
+  it('split the world into Afro-Eurasia and the Americas', () => {
+    expect(landmasses().size).toBe(2)
+    expect(sameLandmass('FRA', 'CHN')).toBe(true)
+    expect(sameLandmass('USA', 'ARG')).toBe(true)
+    expect(sameLandmass('FRA', 'USA')).toBe(false)
+  })
+
+  it('put islands with no land route out of play', () => {
+    for (const code of ['AUS', 'NZL', 'JPN', 'CUB', 'ISL', 'MDG', 'LKA', 'PHL', 'MLT']) {
+      expect(isPlayable(code), `${code} should be out of play`).toBe(false)
+      expect(getCountry(code).component).toBeNull()
+    }
+  })
+})
+
+describe('sea links', () => {
+  it('are limited to fixed crossings you can drive over', () => {
+    expect(SEA_LINKS).toEqual(FIXED_LINKS)
+    for (const group of [CARIBBEAN, PACIFIC]) {
+      for (const link of group) expect(SEA_LINKS).not.toContain(link)
+    }
+  })
+
+  it('reference countries that are in play', () => {
+    for (const { a, b } of SEA_LINKS) {
+      expect(isPlayable(a), `${a} is not in play`).toBe(true)
+      expect(isPlayable(b), `${b} is not in play`).toBe(true)
+    }
+  })
+
+  it('are not listed twice and never link a country to itself', () => {
     const keys = SEA_LINKS.map(({ a, b }) => [a, b].sort().join('-'))
     expect(new Set(keys).size).toBe(keys.length)
+    for (const { a, b } of SEA_LINKS) expect(a).not.toBe(b)
   })
 
   it('all carry a justification', () => {
@@ -91,6 +158,20 @@ describe('sea links', () => {
 
   it('appear in the graph', () => {
     for (const { a, b } of SEA_LINKS) expect(areNeighbours(a, b)).toBe(true)
+  })
+
+  it('keep the fixed links that rescue four countries from the sea', () => {
+    expect(areNeighbours('GBR', 'FRA')).toBe(true) // Channel Tunnel
+    expect(areNeighbours('SGP', 'MYS')).toBe(true) // Johor Causeway
+    expect(areNeighbours('BHR', 'SAU')).toBe(true) // King Fahd Causeway
+    expect(isPlayable('IRL')).toBe(true) // reaches Europe through the UK
+  })
+
+  it('no longer ferry anyone across open water', () => {
+    expect(areNeighbours('ESP', 'MAR')).toBe(false) // Gibraltar
+    expect(areNeighbours('RUS', 'USA')).toBe(false) // Bering Strait
+    expect(areNeighbours('IND', 'LKA')).toBe(false) // Palk Strait
+    expect(areNeighbours('ITA', 'GRC')).toBe(false) // Adriatic
   })
 })
 
@@ -113,29 +194,21 @@ describe('geography that the build is easy to get wrong', () => {
     expect([...getCountry('XKX').neighbours].sort()).toEqual(['ALB', 'MKD', 'MNE', 'SRB'])
   })
 
-  it('includes the microstates', () => {
-    for (const name of ['Singapore', 'Malta', 'Andorra', 'Monaco', 'San Marino', 'Liechtenstein', 'Bahrain', 'Mauritius', 'Maldives', 'Vatican City']) {
-      expect(findByName(name), `${name} should be in play`).toBeDefined()
-    }
-  })
-
-  it('gets the microstate borders right', () => {
+  it('keeps the landlocked microstates in play', () => {
     expect([...getCountry('AND').neighbours].sort()).toEqual(['ESP', 'FRA'])
     expect([...getCountry('LIE').neighbours].sort()).toEqual(['AUT', 'CHE'])
     expect(getCountry('SMR').neighbours).toEqual(['ITA'])
-  })
-
-  it('excludes dependent territories', () => {
-    for (const name of ['Greenland', 'Puerto Rico', 'Antarctica', 'Hong Kong', 'New Caledonia']) {
-      expect(EXCLUDED.has(name)).toBe(true)
-      expect(findByName(name), `${name} should not be playable`).toBeUndefined()
+    expect(getCountry('VAT').neighbours).toEqual(['ITA'])
+    for (const code of ['AND', 'LIE', 'SMR', 'VAT', 'MCO', 'SGP', 'BHR']) {
+      expect(isPlayable(code), `${code} should be playable`).toBe(true)
     }
   })
 
-  it('connects the continents where it should', () => {
-    expect(areNeighbours('ESP', 'MAR')).toBe(true) // Gibraltar
-    expect(areNeighbours('RUS', 'USA')).toBe(true) // Bering Strait
-    expect(areNeighbours('IND', 'LKA')).toBe(true) // Palk Strait
+  it('excludes dependent territories entirely', () => {
+    for (const name of ['Greenland', 'Puerto Rico', 'Antarctica', 'Hong Kong', 'New Caledonia']) {
+      expect(EXCLUDED.has(name)).toBe(true)
+      expect(findByName(name), `${name} should not be a country here`).toBeUndefined()
+    }
   })
 })
 
@@ -148,7 +221,7 @@ describe('paths', () => {
   })
 
   it('is symmetric in length', () => {
-    expect(distance('CHL', 'MNG')).toBe(distance('MNG', 'CHL'))
+    expect(distance('ZAF', 'MNG')).toBe(distance('MNG', 'ZAF'))
   })
 
   it('is zero to itself and one to a neighbour', () => {
@@ -169,6 +242,11 @@ describe('name matching', () => {
     expect(findByName('UK')?.code).toBe('GBR')
   })
 
+  it('still recognises out-of-play countries, so the input can explain itself', () => {
+    expect(findByName('Australia')?.code).toBe('AUS')
+    expect(isPlayable('AUS')).toBe(false)
+  })
+
   it('rejects things that are not countries', () => {
     expect(findByName('Atlantis')).toBeUndefined()
     expect(findByName('')).toBeUndefined()
@@ -178,8 +256,10 @@ describe('name matching', () => {
     expect(normalise('São Tomé & Príncipe')).toBe('saotomeprincipe')
   })
 
-  it('suggests prefix matches first', () => {
+  it('only ever suggests countries you are allowed to name', () => {
     expect(search('ger')[0]?.code).toBe('DEU')
     expect(search('')).toEqual([])
+    expect(search('austral')).toEqual([])
+    for (const country of search('a', 8)) expect(country.component).not.toBeNull()
   })
 })

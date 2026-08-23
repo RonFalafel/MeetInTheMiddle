@@ -8,8 +8,15 @@ export const SETTINGS = {
   /** Most borders between the two secret starts. Higher is a longer game. */
   maxHops: 9,
   /**
-   * Show each player where their partner is. Visible is friendlier; hidden
-   * turns it into a real deduction game. Try both.
+   * Show each player the countries their partner has named, including their
+   * start. Visible is friendlier; hidden turns it into a real deduction game.
+   * Try both.
    */
-  showPartnerChain: true,
+  showPartnerCountries: true,
+  /**
+   * Show how many more countries are needed to join the two sides up. This is
+   * the only signal that makes naming a country far from home worth doing, so
+   * turning it off makes the game much harder.
+   */
+  showCountriesNeeded: true,
 }

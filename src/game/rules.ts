@@ -1,17 +1,29 @@
-import { CODES, areNeighbours, exists, findByName, getCountry, shortestPath } from './graph.ts'
+import {
+  PLAYABLE_CODES,
+  exists,
+  findByName,
+  getCountry,
+  isPlayable,
+  sameLandmass,
+  shortestPath,
+} from './graph.ts'
 import type { CountryCode } from './types.ts'
 
 export type PlayerIndex = 0 | 1
 
-export type Chain = {
+export type Move = {
+  readonly code: CountryCode
   readonly player: PlayerIndex
-  /** Index 0 is the secret start. The last entry is where the player is now. */
-  readonly countries: readonly CountryCode[]
 }
 
+/**
+ * The whole game, as a start pair plus an ordered list of moves. Everything
+ * else is derived, which keeps it trivially serialisable — two devices stay in
+ * sync by agreeing on this list and nothing else.
+ */
 export type GameState = {
-  readonly chains: readonly [Chain, Chain]
-  readonly turn: PlayerIndex
+  readonly starts: readonly [CountryCode, CountryCode]
+  readonly moves: readonly Move[]
   readonly status: 'playing' | 'won'
   /** Borders between the two secret starts. Fixed for the life of the game. */
   readonly optimalDistance: number
@@ -28,18 +40,28 @@ export type StartOptions = {
 const DEFAULT_MIN_HOPS = 5
 const DEFAULT_MAX_HOPS = 9
 
-export function head(chain: Chain): CountryCode {
-  return chain.countries[chain.countries.length - 1]!
+/** Every country on the board, and who put it there. Both starts are included. */
+export function claimedBy(state: GameState): Map<CountryCode, PlayerIndex> {
+  const claimed = new Map<CountryCode, PlayerIndex>([
+    [state.starts[0], 0],
+    [state.starts[1], 1],
+  ])
+  for (const move of state.moves) if (!claimed.has(move.code)) claimed.set(move.code, move.player)
+  return claimed
 }
 
-/** Countries named so far by both players. The score — lower is better. */
+export function claimedCodes(state: GameState): Set<CountryCode> {
+  return new Set(claimedBy(state).keys())
+}
+
+/** Countries named so far. The score — lower is better. */
 export function movesMade(state: GameState): number {
-  return state.chains[0].countries.length - 1 + (state.chains[1].countries.length - 1)
+  return state.moves.length
 }
 
 /**
- * The best possible score. Two starts d borders apart meet when the gap closes
- * to one border, so d - 1 countries have to be named between them.
+ * The best possible score. Two starts d borders apart need d - 1 countries
+ * between them to join up.
  */
 export function par(state: GameState): number {
   return state.optimalDistance - 1
@@ -47,12 +69,73 @@ export function par(state: GameState): number {
 
 /** The route the game was hiding, revealed at the end. */
 export function optimalRoute(state: GameState): CountryCode[] {
-  return shortestPath(state.chains[0].countries[0]!, state.chains[1].countries[0]!)
+  return shortestPath(state.starts[0], state.starts[1])
 }
 
 /**
- * Two starts far enough apart to be interesting. Picks a country, then picks
- * uniformly among the countries the right distance from it.
+ * A route from one start to the other using only countries that have been
+ * named, or null if the two sides are still apart. This is the win condition
+ * and also what gets drawn on the map when the game ends.
+ */
+export function connectingRoute(state: GameState): CountryCode[] | null {
+  const claimed = claimedCodes(state)
+  const [from, to] = state.starts
+  if (from === to) return [from]
+
+  const cameFrom = new Map<CountryCode, CountryCode>([[from, from]])
+  const queue = [from]
+
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i]!
+    for (const next of getCountry(current).neighbours) {
+      if (!claimed.has(next) || cameFrom.has(next)) continue
+      cameFrom.set(next, current)
+      if (next === to) {
+        const route = [to]
+        let step = to
+        while (step !== from) {
+          step = cameFrom.get(step)!
+          route.push(step)
+        }
+        return route.reverse()
+      }
+      queue.push(next)
+    }
+  }
+  return null
+}
+
+/**
+ * How many more countries are needed on the shortest remaining join, ignoring
+ * who owns what. Useful as a hint and for testing that a game is still winnable.
+ */
+export function countriesStillNeeded(state: GameState): number {
+  const claimed = claimedCodes(state)
+  const [from, to] = state.starts
+
+  // Dijkstra where an already-claimed country costs nothing to pass through.
+  const cost = new Map<CountryCode, number>([[from, 0]])
+  const frontier = [from]
+
+  while (frontier.length > 0) {
+    frontier.sort((a, b) => cost.get(a)! - cost.get(b)!)
+    const current = frontier.shift()!
+    if (current === to) return cost.get(current)!
+    for (const next of getCountry(current).neighbours) {
+      const step = next === to || claimed.has(next) ? 0 : 1
+      const candidate = cost.get(current)! + step
+      if (candidate < (cost.get(next) ?? Infinity)) {
+        cost.set(next, candidate)
+        frontier.push(next)
+      }
+    }
+  }
+  return Infinity
+}
+
+/**
+ * Two starts far enough apart to be interesting, and always on the same
+ * landmass — otherwise no sequence of guesses could ever join them.
  */
 export function startPair(options: StartOptions = {}): [CountryCode, CountryCode] {
   const { minHops = DEFAULT_MIN_HOPS, maxHops = DEFAULT_MAX_HOPS, random = Math.random } = options
@@ -61,8 +144,8 @@ export function startPair(options: StartOptions = {}): [CountryCode, CountryCode
 
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)]!
 
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const from = pick(CODES)
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const from = pick(PLAYABLE_CODES)
     const candidates = countriesWithin(from, minHops, maxHops)
     if (candidates.length > 0) return [from, pick(candidates)]
   }
@@ -93,76 +176,85 @@ export function newGame(options: StartOptions = {}): GameState {
   return gameFrom(a, b)
 }
 
-/** A game with chosen starts. Deterministic, which is what tests want. */
+/** A game with chosen starts. Deterministic, which is what tests and rooms want. */
 export function gameFrom(a: CountryCode, b: CountryCode): GameState {
-  return {
-    chains: [
-      { player: 0, countries: [a] },
-      { player: 1, countries: [b] },
-    ],
-    turn: 0,
-    status: haveMet(a, b) ? 'won' : 'playing',
+  if (!sameLandmass(a, b)) {
+    throw new Error(`${a} and ${b} are not on the same landmass, so they could never meet`)
+  }
+  const base: GameState = {
+    starts: [a, b],
+    moves: [],
+    status: 'playing',
     optimalDistance: shortestPath(a, b).length - 1,
   }
+  return { ...base, status: connectingRoute(base) ? 'won' : 'playing' }
 }
 
-/**
- * The chains touch when the two players are standing in the same country, or in
- * countries that border each other. Where they have *been* does not count —
- * you have to still be there.
- */
-function haveMet(a: CountryCode, b: CountryCode): boolean {
-  return a === b || areNeighbours(a, b)
+/** Replays a move list, which is how a device catches up after reconnecting. */
+export function replay(
+  starts: readonly [CountryCode, CountryCode],
+  moves: readonly Move[],
+): GameState {
+  let state = gameFrom(starts[0], starts[1])
+  for (const move of moves) state = applyMove(state, move.code, move.player)
+  return state
 }
 
-export type IllegalReason = 'game-over' | 'unknown-country' | 'not-adjacent' | 'already-visited'
+export type IllegalReason =
+  | 'game-over'
+  | 'unknown-country'
+  | 'out-of-play'
+  | 'wrong-landmass'
+  | 'already-named'
 
 export type MoveCheck =
   | { readonly ok: true; readonly code: CountryCode }
   | { readonly ok: false; readonly reason: IllegalReason; readonly message: string }
 
 /**
- * Validates a move for the player whose turn it is. Rejection is free — there
- * is no penalty for a wrong guess, so this can stay honest about what went
- * wrong instead of just saying no.
+ * Validates a country against the board. There is no adjacency rule and no
+ * turn order: name anywhere, any time, and it either helps or it does not.
+ * Rejections are free — none of them cost a guess.
  */
 export function checkMove(state: GameState, code: CountryCode): MoveCheck {
   if (state.status === 'won') {
-    return { ok: false, reason: 'game-over', message: 'The game is already over.' }
+    return { ok: false, reason: 'game-over', message: 'You already met.' }
   }
   if (!exists(code)) {
     return { ok: false, reason: 'unknown-country', message: `${code} is not a country in this game.` }
   }
 
-  const chain = state.chains[state.turn]
-  const from = head(chain)
+  const country = getCountry(code)
 
-  if (chain.countries.includes(code)) {
+  if (!isPlayable(code)) {
     return {
       ok: false,
-      reason: 'already-visited',
-      message: `You have already been to ${getCountry(code).name}.`,
+      reason: 'out-of-play',
+      message: `${country.name} has no land border with anywhere, so it is not in this game.`,
     }
   }
-
-  if (!areNeighbours(from, code)) {
+  if (!sameLandmass(code, state.starts[0])) {
     return {
       ok: false,
-      reason: 'not-adjacent',
-      message: `${getCountry(code).name} does not border ${getCountry(from).name}.`,
+      reason: 'wrong-landmass',
+      message: `${country.name} is on a different landmass — you could never walk there.`,
+    }
+  }
+  if (claimedCodes(state).has(code)) {
+    return {
+      ok: false,
+      reason: 'already-named',
+      message: `${country.name} is already on the board.`,
     }
   }
 
   return { ok: true, code }
 }
 
-/**
- * What the player typed, checked. Resolves the name first so the rejection can
- * quote what they actually wrote, then defers to `checkMove`.
- */
+/** What a player typed, checked. Quotes them back when the name means nothing. */
 export function checkGuess(state: GameState, guess: string): MoveCheck {
   if (state.status === 'won') {
-    return { ok: false, reason: 'game-over', message: 'The game is already over.' }
+    return { ok: false, reason: 'game-over', message: 'You already met.' }
   }
 
   const country = findByName(guess)
@@ -177,20 +269,10 @@ export function checkGuess(state: GameState, guess: string): MoveCheck {
 }
 
 /** Applies a legal move. Throws if it is not one, so check first. */
-export function applyMove(state: GameState, code: CountryCode): GameState {
+export function applyMove(state: GameState, code: CountryCode, player: PlayerIndex): GameState {
   const check = checkMove(state, code)
   if (!check.ok) throw new Error(check.message)
 
-  const moved: Chain = {
-    player: state.turn,
-    countries: [...state.chains[state.turn].countries, check.code],
-  }
-  const chains: [Chain, Chain] = state.turn === 0 ? [moved, state.chains[1]] : [state.chains[0], moved]
-
-  return {
-    chains,
-    turn: state.turn === 0 ? 1 : 0,
-    status: haveMet(head(chains[0]), head(chains[1])) ? 'won' : 'playing',
-    optimalDistance: state.optimalDistance,
-  }
+  const next: GameState = { ...state, moves: [...state.moves, { code: check.code, player }] }
+  return { ...next, status: connectingRoute(next) ? 'won' : 'playing' }
 }

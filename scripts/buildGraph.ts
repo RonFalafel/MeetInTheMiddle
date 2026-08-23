@@ -17,6 +17,7 @@ import iso from 'i18n-iso-countries'
 import { DISPUTED, EXCLUDED, EDGE_BLACKLIST } from '../src/game/playSet.ts'
 import { SEA_LINKS } from '../src/game/seaLinks.ts'
 import { NAME_OVERRIDES, ALIASES } from '../src/game/names.ts'
+import { SETTINGS } from '../src/settings.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
@@ -101,6 +102,66 @@ for (const { a, b, why } of SEA_LINKS) {
   link(a, b)
 }
 
+// ------------------------------------------------------------------ landmasses
+
+const neighboursOf = (code: CountryCode) => [...(edges.get(code) ?? [])]
+
+const distancesFrom = (start: CountryCode): Map<CountryCode, number> => {
+  const depth = new Map([[start, 0]])
+  const queue = [start]
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i]!
+    for (const next of neighboursOf(current)) {
+      if (depth.has(next)) continue
+      depth.set(next, depth.get(current)! + 1)
+      queue.push(next)
+    }
+  }
+  return depth
+}
+
+const seen = new Set<CountryCode>()
+const landmasses: CountryCode[][] = []
+for (const code of edges.keys()) {
+  if (seen.has(code)) continue
+  const members = [...distancesFrom(code).keys()]
+  for (const member of members) seen.add(member)
+  landmasses.push(members)
+}
+landmasses.sort((a, b) => b.length - a.length)
+
+/** The longest shortest path inside a landmass — how far apart two starts could be. */
+const diameterOf = (members: CountryCode[]): number => {
+  let longest = 0
+  for (const member of members) {
+    for (const hops of distancesFrom(member).values()) longest = Math.max(longest, hops)
+  }
+  return longest
+}
+
+/**
+ * A landmass can host a game only if two countries on it can be far enough
+ * apart. Anything smaller is out of play, which is what stops the generator
+ * from ever producing an unwinnable start pair.
+ */
+const componentOf = new Map<CountryCode, number>()
+const playableLandmasses: CountryCode[][] = []
+const droppedLandmasses: CountryCode[][] = []
+
+for (const members of landmasses) {
+  if (diameterOf(members) >= SETTINGS.minHops) {
+    const index = playableLandmasses.length
+    for (const member of members) componentOf.set(member, index)
+    playableLandmasses.push(members)
+  } else {
+    droppedLandmasses.push(members)
+  }
+}
+
+if (playableLandmasses.length === 0) {
+  fail(`No landmass has two countries ${SETTINGS.minHops} borders apart. Enable more sea links.`)
+}
+
 // ------------------------------------------------------------------ countries
 
 const displayName = (code: CountryCode, index: number): string => {
@@ -120,6 +181,7 @@ const countries = [...primaryGeometry.entries()]
       aliases: ALIASES[code] ?? [],
       centroid: [round(longitude), round(latitude)] as const,
       neighbours: [...edges.get(code)!].sort(),
+      component: componentOf.get(code) ?? null,
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
@@ -164,27 +226,18 @@ for (const country of countries) {
     if (!other!.neighbours.includes(country.code)) {
       fail(`Asymmetric border: ${country.code} -> ${neighbour} but not back.`)
     }
-  }
-}
-
-const reachable = (start: CountryCode): Set<CountryCode> => {
-  const seen = new Set([start])
-  const queue = [start]
-  for (let i = 0; i < queue.length; i++) {
-    for (const next of byCode.get(queue[i]!)!.neighbours) {
-      if (!seen.has(next)) {
-        seen.add(next)
-        queue.push(next)
-      }
+    if (country.component !== other!.component) {
+      fail(`${country.code} and ${neighbour} border each other but are on different landmasses.`)
     }
   }
-  return seen
+  if (country.component !== null && country.neighbours.length === 0) {
+    fail(`${country.code} is in play but borders nothing.`)
+  }
 }
 
-const connected = reachable(countries[0]!.code)
-if (connected.size !== countries.length) {
-  const stranded = countries.filter((c) => !connected.has(c.code)).map((c) => `${c.name} (${c.code})`)
-  fail(`${stranded.length} countries unreachable. Add sea links for:\n  ${stranded.join('\n  ')}`)
+for (const [index, members] of playableLandmasses.entries()) {
+  const reached = distancesFrom(members[0]!)
+  if (reached.size !== members.length) fail(`Landmass ${index} is not internally connected.`)
 }
 
 // ---------------------------------------------------------------------- write
@@ -193,7 +246,8 @@ const body = countries
   .map(
     (c) =>
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
-      ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], neighbours: ${JSON.stringify(c.neighbours)} },`,
+      ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
+      ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')
 
@@ -221,18 +275,35 @@ writeFileSync(
     `// Run \`npm run graph\` after changing playSet.ts, seaLinks.ts or names.ts.\n\n` +
     `import type { Country, CountryCode } from '../types.ts'\n\n` +
     `export const COUNTRIES: readonly Country[] = [\n${body}\n]\n\n` +
-    `/** Natural Earth polygon name -> the country it draws, or null if out of play. */\n` +
+    `/** Natural Earth polygon name -> the country it draws, or null if it is not a country here. */\n` +
     `export const SHAPE_CODES: Readonly<Record<string, CountryCode | null>> = {\n${shapeBody}\n}\n`,
 )
 
 // --------------------------------------------------------------------- report
 
-const degrees = countries.map((c) => c.neighbours.length)
-const deadEnds = countries.filter((c) => c.neighbours.length === 1)
+const inPlay = countries.filter((c) => c.component !== null)
+const borders = inPlay.reduce((total, c) => total + c.neighbours.length, 0) / 2
 
-console.log(`\n  ${countries.length} countries, ${degrees.reduce((a, b) => a + b, 0) / 2} borders`)
-console.log(`  ${SEA_LINKS.length} of them sea links`)
-console.log(`  connected: yes`)
-console.log(`\n  dead ends (${deadEnds.length}):`)
-for (const c of deadEnds) console.log(`    ${c.name} -> ${byCode.get(c.neighbours[0]!)!.name}`)
+console.log(`\n  ${countries.length} countries known, ${inPlay.length} in play, ${borders} borders`)
+console.log(`  ${SEA_LINKS.length} sea links enabled\n`)
+
+for (const [index, members] of playableLandmasses.entries()) {
+  const biggest = members
+    .map((code) => byCode.get(code)!)
+    .sort((a, b) => b.neighbours.length - a.neighbours.length)[0]!
+  console.log(
+    `  landmass ${index}: ${String(members.length).padStart(3)} countries, ` +
+      `diameter ${diameterOf(members)}, hub ${biggest.name}`,
+  )
+}
+
+const dropped = droppedLandmasses.flat()
+console.log(`\n  ${dropped.length} out of play, no land route to a playable landmass:`)
+console.log(
+  '   ',
+  dropped
+    .map((code) => byCode.get(code)!.name)
+    .sort()
+    .join(', '),
+)
 console.log('\n  wrote src/game/data/countries.generated.ts\n')

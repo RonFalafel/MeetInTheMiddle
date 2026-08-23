@@ -2,28 +2,31 @@
  * Plays a game without a browser, so the rules can be argued with before any
  * pixels exist.
  *
- *   npm run play                              random game, walked optimally
- *   npm run play -- --from PRT --to POL       chosen starts, walked optimally
+ *   npm run play                              random game, played optimally
+ *   npm run play -- --from PRT --to POL       chosen starts, played optimally
  *   npm run play -- --from PRT --to POL ESP DEU
- *                                             chosen starts, scripted moves
+ *                                             chosen starts, named countries
  *   npm run play -- --stats 2000              par distribution over N games
  *
- * Moves are country codes or names, alternating between the two players.
+ * Countries are codes or names. There are no turns, so they are just attributed
+ * to alternating players for the transcript.
  */
 
-import { distance, getCountry, resolveCountry } from '../src/game/graph.ts'
+import { getCountry, resolveCountry } from '../src/game/graph.ts'
 import {
   applyMove,
   checkMove,
+  claimedBy,
+  connectingRoute,
+  countriesStillNeeded,
   gameFrom,
-  head,
   movesMade,
   newGame,
   optimalRoute,
   par,
   startPair,
 } from '../src/game/rules.ts'
-import type { GameState } from '../src/game/rules.ts'
+import type { PlayerIndex } from '../src/game/rules.ts'
 import type { CountryCode } from '../src/game/types.ts'
 
 const argv = process.argv.slice(2)
@@ -61,78 +64,66 @@ function playOneGame(): void {
   console.log(`\n  ${name(start[0])}  ...  ${name(start[1])}`)
   console.log(`  ${game.optimalDistance} borders apart, so par is ${par(game)}\n`)
 
-  const moves = scripted.length > 0 ? scripted : optimalMoves(game)
+  const names = scripted.length > 0 ? scripted : optimalRoute(game).slice(1, -1)
 
-  for (const move of moves) {
+  names.forEach((guess, index) => {
+    const player = (index % 2) as PlayerIndex
     if (game.status === 'won') {
-      console.log(`  (ignored "${move}" — already met)`)
-      continue
+      console.log(`  (ignored "${guess}" — already met)`)
+      return
     }
-    const player = game.turn
-    const country = resolveCountry(move)
+    const country = resolveCountry(guess)
     if (!country) {
-      console.log(`  P${player + 1}  ${move} — rejected: no such country`)
-      continue
+      console.log(`  P${player + 1}  ${guess} — rejected: no such country`)
+      return
     }
     const check = checkMove(game, country.code)
     if (!check.ok) {
-      console.log(`  P${player + 1}  ${move} — rejected: ${check.message}`)
-      continue
+      console.log(`  P${player + 1}  ${guess} — rejected: ${check.message}`)
+      return
     }
-    game = applyMove(game, check.code)
-    console.log(`  P${player + 1}  ${name(check.code)}`)
-  }
+    game = applyMove(game, check.code, player)
+    const left = countriesStillNeeded(game)
+    console.log(`  P${player + 1}  ${name(check.code).padEnd(24)} ${left === 0 ? 'joined up' : `${left} still needed`}`)
+  })
 
   console.log()
   if (game.status === 'won') {
-    console.log(`  Met in ${name(head(game.chains[0]))} / ${name(head(game.chains[1]))}`)
-    console.log(`  Score ${movesMade(game)}, par ${par(game)}` +
-      (movesMade(game) === par(game) ? '  — perfect' : ` — ${movesMade(game) - par(game)} over`))
+    console.log(`  Route: ${connectingRoute(game)!.map(name).join(' → ')}`)
+    const over = movesMade(game) - par(game)
+    console.log(`  Score ${movesMade(game)}, par ${par(game)}${over === 0 ? '  — perfect' : ` — ${over} over`}`)
   } else {
-    console.log(`  Unfinished: P1 in ${name(head(game.chains[0]))}, P2 in ${name(head(game.chains[1]))}`)
+    console.log(`  Unfinished: ${claimedBy(game).size} countries on the board, ${countriesStillNeeded(game)} still needed`)
   }
   console.log(`  Best route was ${optimalRoute(game).map(name).join(' → ')}\n`)
 }
 
-/** Both players walk the shortest route toward each other. This is par by definition. */
-function optimalMoves(game: GameState): CountryCode[] {
-  const route = optimalRoute(game)
-  const moves: CountryCode[] = []
-  let low = 1
-  let high = route.length - 2
-  let turn = 0
-  while (low <= high) {
-    moves.push(turn === 0 ? route[low++]! : route[high--]!)
-    turn = turn === 0 ? 1 : 0
-  }
-  return moves
-}
-
 function reportStats(games: number): void {
   const pars = new Map<number, number>()
+  const byLandmass = new Map<number, number>()
   const starts = new Map<CountryCode, number>()
 
   for (let i = 0; i < games; i++) {
     const game = newGame()
-    const value = par(game)
-    pars.set(value, (pars.get(value) ?? 0) + 1)
-    for (const chain of game.chains) {
-      const code = chain.countries[0]!
-      starts.set(code, (starts.get(code) ?? 0) + 1)
-    }
+    pars.set(par(game), (pars.get(par(game)) ?? 0) + 1)
+    const landmass = getCountry(game.starts[0]).component!
+    byLandmass.set(landmass, (byLandmass.get(landmass) ?? 0) + 1)
+    for (const code of game.starts) starts.set(code, (starts.get(code) ?? 0) + 1)
   }
 
   console.log(`\n  ${games} games\n`)
   console.log('  par   games')
   for (const [value, count] of [...pars].sort((a, b) => a[0] - b[0])) {
-    console.log(`  ${String(value).padStart(3)}   ${String(count).padStart(5)}  ${'#'.repeat(Math.round((count / games) * 60))}`)
+    const bar = '#'.repeat(Math.round((count / games) * 60))
+    console.log(`  ${String(value).padStart(3)}   ${String(count).padStart(5)}  ${bar}`)
+  }
+
+  console.log('\n  landmass share:')
+  for (const [landmass, count] of [...byLandmass].sort((a, b) => a[0] - b[0])) {
+    console.log(`    ${landmass}: ${((count / games) * 100).toFixed(1)}%`)
   }
 
   const ranked = [...starts].sort((a, b) => b[1] - a[1])
-  console.log(`\n  ${starts.size} of 196 countries appeared as a start`)
-  console.log(`  most common: ${ranked.slice(0, 6).map(([c, n]) => `${name(c)} ${n}`).join(', ')}`)
-
-  const sample = newGame()
-  console.log(`\n  sample: ${name(sample.chains[0].countries[0]!)} to ${name(sample.chains[1].countries[0]!)}` +
-    `, ${distance(sample.chains[0].countries[0]!, sample.chains[1].countries[0]!)} apart\n`)
+  console.log(`\n  ${starts.size} distinct start countries`)
+  console.log(`  most common: ${ranked.slice(0, 6).map(([c, n]) => `${name(c)} ${n}`).join(', ')}\n`)
 }

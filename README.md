@@ -1,11 +1,16 @@
 # Meet in the Middle
 
 A cooperative geography game for two people. You each start in a different
-secret country and walk toward each other by naming bordering countries. The
-game ends when you meet. Your score is every country you both named — lower is
-better, and you never find out where your partner started until you meet them.
+secret country and name countries — any country, in any order — until the
+countries on the board join your two starts into one unbroken chain of land
+borders. Your score is every country you both named; lower is better.
 
-Game design lives in [Specs/SPEC.md](Specs/SPEC.md).
+There are no turns. Either of you can name a country whenever you think of one,
+which is the point: it is meant to be played out loud, at the same time, from
+two phones.
+
+Game design notes are in [Specs/SPEC.md](Specs/SPEC.md), though the rules have
+moved on from what is written there.
 
 ## Running it
 
@@ -14,23 +19,60 @@ npm install
 npm run dev
 ```
 
+For two-device games you also need the sync server:
+
+```bash
+npm run sync
+```
+
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Vite dev server |
-| `npm test` | vitest, once |
-| `npm run typecheck` | `tsc -b` across app and scripts |
+| `npm run dev` | Vite dev server, proxying `/ws` to the sync server |
+| `npm run sync` | WebSocket server for two-device rooms, on :8081 |
+| `npm test` | vitest, once — game rules and the room protocol |
+| `npm run typecheck` | `tsc -b` across app, scripts and server |
 | `npm run build` | typecheck then production bundle |
 | `npm run graph` | regenerate the country graph |
 | `npm run play` | play a game in the terminal |
+
+## The rules, as built
+
+- **Name any country, any time.** No adjacency requirement and no turn order.
+  A country that joins nothing up is still a legal guess and still costs you a
+  point, so the risk is naming something useless.
+- **You win when the board connects the two starts.** Not when the players are
+  adjacent — when there is an unbroken run of named countries from one start to
+  the other. Who named which country does not matter.
+- **Par is one fewer than the gap.** Two starts five borders apart need four
+  countries between them, so par is four.
+- **Only land borders count.** Bridges and tunnels you can drive across count
+  as land; ferries and open water do not.
+
+The knobs worth arguing about live in [src/settings.ts](src/settings.ts): how
+far apart the starts are, whether you can see your partner's countries, and
+whether the game tells you how many more countries are needed.
+
+## Two phones
+
+One player taps **Start a game** and sends the other the link — the room code is
+four characters and lives in the URL. Both devices then see the same board and
+either can name a country at any moment.
+
+The server is authoritative: it imports the same rules module the browser does,
+so a client cannot talk its way into an illegal move. Rooms live in memory,
+hold two seats, and expire after six hours. A device that drops off keeps its
+seat via a token in `localStorage`, and gets it back on reconnect; a seat
+nobody returns to opens up after a minute so a lost token cannot brick a room.
+
+Two tabs of the same browser share `localStorage`, so they fight over one seat.
+That is only a problem when testing on one machine — use a private window.
 
 ## How the country data works
 
 The country graph is generated, never hand-edited. `npm run graph` reads
 [world-atlas](https://github.com/topojson/world-atlas) 50m TopoJSON, derives
 land borders from shared arcs in the topology, folds in the hand-written tables
-below, and writes `src/game/data/countries.generated.ts`. It refuses to write a
-graph that is asymmetric, self-bordering, or disconnected, and tells you which
-countries were stranded.
+below, and writes `src/game/data/countries.generated.ts`.
 
 The three files worth editing are all curation, not code:
 
@@ -39,34 +81,44 @@ The three files worth editing are all curation, not code:
   merged into the state that administers them. A merged entity donates its
   borders to its parent, which is why Morocco still borders Mauritania after
   Western Sahara is folded in.
-- **[`src/game/seaLinks.ts`](src/game/seaLinks.ts)** — the crossings, grouped by
-  kind and each carrying its distance. Roughly forty countries have no land
-  border at all, so without this table the world is in 25 pieces.
+- **[`src/game/seaLinks.ts`](src/game/seaLinks.ts)** — crossings, grouped by
+  kind and each carrying its distance. Only the fixed links — Channel Tunnel,
+  Øresund Bridge, King Fahd and Johor causeways — are switched on. Uncomment a
+  group to bring back a region.
 - **[`src/game/names.ts`](src/game/names.ts)** — display names and the
   alternatives a player might type.
 
-196 countries, 374 borders, 60 of them by sea.
+Without ferries the world is not one connected graph, so the generator works
+out which landmasses can host a game and marks the rest out of play:
 
-Rules and graph code in `src/game/` are pure functions with no React imports, so
-the whole game is testable without a browser — `npm run play` walks a full game
-in the terminal. Rendering lives in `src/ui/`.
+| | countries |
+| --- | --- |
+| Afro-Eurasia | 135 |
+| The Americas | 22 |
+| Out of play — no land route anywhere | 39 |
 
-The knobs SPEC.md says to settle by playing rather than arguing are in
-[`src/settings.ts`](src/settings.ts): how far apart the starts are, and whether
-you can see where your partner is.
+Islands still draw on the map, greyed out, and the game will not suggest them
+or accept them. Both starts always come from the same landmass, so a game can
+never be unwinnable — the generator refuses to build a world where that is
+possible, and there is a test for it.
+
+Rules and graph code in `src/game/` are pure functions with no React imports,
+which is what lets the same code run in the browser, in the server, and in
+`npm run play`. Rendering lives in `src/ui/`, the sync server in `server/`.
 
 ## Deploying
 
-Hosted at `meet.ronfalafel.com` — a static bundle behind nginx, reached through
-the Cloudflare tunnel already running on the VM.
+Hosted at `meet.ronfalafel.com` — nginx serving the bundle, the sync server
+behind it on the same origin, both reached through the Cloudflare tunnel
+already running on the VM.
 
 ```bash
 docker compose up -d --build
 ```
 
-The container binds to `127.0.0.1:8080`, so nothing is exposed on the VM's
-public interface; the tunnel is the only way in. Add the hostname to the
-cloudflared config:
+Only nginx publishes a port, and only on loopback, so the tunnel is the only
+way in; the sync server is reachable solely over the compose network. Add the
+hostname to the cloudflared config:
 
 ```yaml
 ingress:
@@ -81,5 +133,6 @@ Then point DNS at the tunnel once:
 cloudflared tunnel route dns <tunnel-name> meet.ronfalafel.com
 ```
 
-If cloudflared runs as a container rather than on the host, put it on the same
-compose network and use `http://meet:80` instead of localhost.
+Cloudflare tunnels carry WebSockets without extra configuration. If cloudflared
+runs as a container rather than on the host, put it on the same compose network
+and use `http://web:80` instead of localhost.

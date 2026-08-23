@@ -7,6 +7,21 @@ const byCode = new Map<CountryCode, Country>(COUNTRIES.map((c) => [c.code, c]))
 
 export const CODES: readonly CountryCode[] = COUNTRIES.map((c) => c.code)
 
+/** Countries that can actually appear in a game. Islands with no land route are not among them. */
+export const PLAYABLE_CODES: readonly CountryCode[] = COUNTRIES.filter(
+  (c) => c.component !== null,
+).map((c) => c.code)
+
+export function isPlayable(code: CountryCode): boolean {
+  return byCode.get(code)?.component != null
+}
+
+/** Two countries can only meet if they are on the same landmass. */
+export function sameLandmass(a: CountryCode, b: CountryCode): boolean {
+  const left = byCode.get(a)?.component
+  return left != null && left === byCode.get(b)?.component
+}
+
 export function getCountry(code: CountryCode): Country {
   const country = byCode.get(code)
   if (!country) throw new Error(`Unknown country code: ${code}`)
@@ -89,13 +104,18 @@ export function resolveCountry(text: string): Country | undefined {
   return findByName(text)
 }
 
-/** Names and aliases beginning with the typed text, best for an autocomplete. */
+/**
+ * Names and aliases beginning with the typed text, best for an autocomplete.
+ * Only suggests countries that are in play — offering Australia when Australia
+ * can never be part of a route is just a trap.
+ */
 export function search(text: string, limit = 8): Country[] {
   const needle = normalise(text)
   if (!needle) return []
   const starts: Country[] = []
   const contains: Country[] = []
   for (const country of COUNTRIES) {
+    if (country.component === null) continue
     const haystacks = [country.name, ...country.aliases].map(normalise)
     if (haystacks.some((h) => h.startsWith(needle))) starts.push(country)
     else if (haystacks.some((h) => h.includes(needle))) contains.push(country)

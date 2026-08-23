@@ -1,14 +1,15 @@
 :root {
   --bg: #0f1218;
   --panel: #161c26;
-  --ocean: #121a25;
+  --sea: #121a25;
   --land: #2b3543;
-  --land-out: #1b2230;
+  --land-out: #1a212c;
   --border: #26303d;
   --text: #e6e9ef;
   --muted: #8b95a6;
   --p0: #f0a63c;
   --p1: #45c8bf;
+  --bad: #ff9a8b;
 
   color-scheme: dark;
   font-family: ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -20,6 +21,11 @@
   margin: 0;
 }
 
+html,
+body {
+  overscroll-behavior: none; /* no pull-to-refresh while dragging the map */
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -28,99 +34,121 @@ body {
 }
 
 main {
-  max-width: 62rem;
+  max-width: 46rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  padding: 0.75rem 0.75rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.75rem;
 }
+
+/* ------------------------------------------------------------------ header */
 
 header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 h1 {
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 
 .score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
   color: var(--muted);
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 
 .score strong {
   color: var(--text);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
+}
+
+.score em {
+  font-style: normal;
+  padding-left: 0.35rem;
+  border-left: 1px solid var(--border);
 }
 
 /* ---------------------------------------------------------------- the map */
 
-.map {
-  width: 100%;
-  height: auto;
-  display: block;
-  background: var(--ocean);
+.map-frame {
+  position: relative;
+  /* Tall enough to be worth looking at on a phone; the map crops and pans. */
+  height: 38dvh;
+  min-height: 230px;
   border: 1px solid var(--border);
   border-radius: 10px;
+  overflow: hidden;
+  background: var(--sea);
 }
 
-.sphere {
-  fill: var(--ocean);
+.map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* touch-action is set inline by the zoom hook, so a pinch never zooms the page */
+  cursor: grab;
+}
+
+.map:active {
+  cursor: grabbing;
+}
+
+.sea {
+  fill: var(--sea);
 }
 
 .land {
   fill: var(--land);
-  stroke: var(--ocean);
-  stroke-width: 0.4;
+  stroke: var(--sea);
+  vector-effect: non-scaling-stroke;
 }
 
 .land.out-of-play {
   fill: var(--land-out);
 }
 
-/* Where you have been is faded; where you are now is solid. */
 .land.player-0 {
   fill: var(--p0);
-  fill-opacity: 0.45;
+  fill-opacity: 0.5;
 }
 
 .land.player-1 {
   fill: var(--p1);
-  fill-opacity: 0.45;
+  fill-opacity: 0.5;
 }
 
-.land.current {
+.land.start {
   fill-opacity: 1;
 }
 
-.head .halo {
+.start-marker .halo {
   fill: none;
-  stroke: var(--ocean);
-  stroke-width: 4.5;
+  stroke: var(--sea);
 }
 
-.head .ring {
+.start-marker .ring {
   fill: none;
-  stroke-width: 2;
 }
 
-.head.player-0 .ring {
+.start-marker.player-0 .ring {
   stroke: var(--p0);
 }
 
-.head.player-1 .ring {
+.start-marker.player-1 .ring {
   stroke: var(--p1);
 }
 
 circle.tiny {
-  stroke: var(--ocean);
+  stroke: var(--sea);
   stroke-width: 1;
 }
 
@@ -134,37 +162,56 @@ circle.tiny.player-1 {
 
 .route {
   fill: none;
-  stroke: var(--muted);
-  stroke-width: 1.5;
-  stroke-dasharray: 5 4;
+  stroke: var(--text);
+  stroke-linejoin: round;
+  stroke-dasharray: 6 4;
+  opacity: 0.85;
 }
 
-/* ------------------------------------------------------------ taking a turn */
+.reset-zoom {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: rgb(15 18 24 / 85%);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
 
-.turn,
-.summary {
+/* ---------------------------------------------------------------- playing */
+
+.panel {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 1rem;
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.7rem;
 }
 
-h2 {
-  font-size: 1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.standing {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.standing .pip {
+  margin-right: 0.4rem;
+}
+
+.standing em {
+  font-style: normal;
+  color: var(--muted);
 }
 
 .pip {
-  width: 0.7rem;
-  height: 0.7rem;
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
   border-radius: 50%;
-  flex: none;
+  vertical-align: baseline;
 }
 
 .pip.player-0 {
@@ -181,13 +228,13 @@ h2 {
 
 input {
   width: 100%;
-  padding: 0.7rem 0.85rem;
+  padding: 0.8rem 0.85rem;
   font: inherit;
   font-size: 1rem; /* anything smaller and iOS zooms the page on focus */
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
 }
 
 input:focus-visible {
@@ -201,21 +248,20 @@ input:focus-visible {
   margin-top: 0.4rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  max-height: 13rem;
+  border-radius: 9px;
+  max-height: 14rem;
   overflow-y: auto;
 }
 
 .suggestions button {
   width: 100%;
   text-align: left;
-  padding: 0.55rem 0.6rem;
+  padding: 0.7rem 0.6rem; /* a comfortable thumb target */
   font: inherit;
   color: var(--text);
   background: none;
   border: 0;
-  border-radius: 6px;
-  cursor: pointer;
+  border-radius: 7px;
 }
 
 .suggestions button.active,
@@ -224,91 +270,238 @@ input:focus-visible {
 }
 
 .error {
-  color: #ff9a8b;
+  color: var(--bad);
   font-size: 0.9rem;
+  line-height: 1.4;
 }
 
-/* ------------------------------------------------------------------ chains */
-
-.chains {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
-.chain h3 {
-  font-size: 0.85rem;
+.chip {
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.chip.on.player-0 {
+  color: var(--bg);
+  background: var(--p0);
+  border-color: var(--p0);
+}
+
+.chip.on.player-1 {
+  color: var(--bg);
+  background: var(--p1);
+  border-color: var(--p1);
+}
+
+/* ----------------------------------------------------------------- board */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chips h3 {
+  font-size: 0.75rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
 }
 
-.chain ol {
+.chips ul {
   list-style: none;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
-.chain li {
+.chips li {
   padding: 0.25rem 0.55rem;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 999px;
 }
 
-.chain.player-0 li.start {
+.chips.player-0 li.start {
   border-color: var(--p0);
 }
 
-.chain.player-1 li.start {
+.chips.player-1 li.start {
   border-color: var(--p1);
 }
 
 .hidden-chain {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
-/* ----------------------------------------------------------------- the end */
+/* ------------------------------------------------------------------- end */
 
 .summary h2 {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
+  font-weight: 650;
 }
 
 .verdict {
   color: var(--muted);
+  line-height: 1.5;
 }
 
-.summary .route {
-  font-size: 0.85rem;
+.route-line {
+  font-size: 0.82rem;
   line-height: 1.6;
   color: var(--muted);
 }
 
-.summary .route span {
+.route-line span {
   color: var(--text);
+  font-weight: 600;
 }
 
-button {
+button.primary {
   align-self: flex-start;
-  padding: 0.6rem 1.1rem;
+  padding: 0.7rem 1.2rem;
   font: inherit;
   font-weight: 600;
   color: var(--bg);
   background: var(--p0);
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
+}
+
+button {
   cursor: pointer;
 }
 
-@media (max-width: 34rem) {
-  .chains {
-    grid-template-columns: 1fr;
+/* --------------------------------------------------------------- wider up */
+
+@media (min-width: 40rem) {
+  main {
+    padding: 1.25rem 1rem 3rem;
+    gap: 1rem;
   }
+
+  h1 {
+    font-size: 1.3rem;
+  }
+
+  .map-frame {
+    height: auto;
+    aspect-ratio: 960 / 413;
+  }
+
+  .board {
+    flex-direction: row;
+  }
+
+  .board > * {
+    flex: 1;
+  }
+}
+
+/* ----------------------------------------------------------------- lobby */
+
+.lobby {
+  gap: 1rem;
+}
+
+.lobby-intro p {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.panel h2 {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.join {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.join input {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.join button,
+.panel > button {
+  padding: 0.7rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.panel > button.primary {
+  color: var(--bg);
+  background: var(--p0);
+  border-color: var(--p0);
+}
+
+/* --------------------------------------------------------------- room bar */
+
+.roombar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.roombar .code {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.roombar .state {
+  flex: 1;
+  color: var(--muted);
+}
+
+.roombar .state.ok {
+  color: var(--p1);
+}
+
+.roombar button {
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
 }

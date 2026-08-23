@@ -17,7 +17,7 @@ export type SeaLink = {
 }
 
 /** You can drive across these. Hard to argue with. */
-const FIXED_LINKS: readonly SeaLink[] = [
+export const FIXED_LINKS: readonly SeaLink[] = [
   { a: 'GBR', b: 'FRA', why: 'Channel Tunnel, 50 km' },
   { a: 'DNK', b: 'SWE', why: 'Øresund Bridge, 16 km' },
   { a: 'BHR', b: 'SAU', why: 'King Fahd Causeway, 25 km' },
@@ -25,7 +25,7 @@ const FIXED_LINKS: readonly SeaLink[] = [
 ]
 
 /** Close enough to see across on a clear day. */
-const NARROW_STRAITS: readonly SeaLink[] = [
+export const NARROW_STRAITS: readonly SeaLink[] = [
   { a: 'ESP', b: 'MAR', why: 'Strait of Gibraltar, 14 km' },
   { a: 'EGY', b: 'SAU', why: 'Strait of Tiran, 13 km' },
   { a: 'YEM', b: 'DJI', why: 'Bab-el-Mandeb, 30 km' },
@@ -37,7 +37,7 @@ const NARROW_STRAITS: readonly SeaLink[] = [
 ]
 
 /** Routine ferry distance. */
-const SHORT_CROSSINGS: readonly SeaLink[] = [
+export const SHORT_CROSSINGS: readonly SeaLink[] = [
   { a: 'ITA', b: 'ALB', why: 'Strait of Otranto, 72 km' },
   { a: 'ITA', b: 'MLT', why: 'Malta to Sicily, 80 km' },
   { a: 'ITA', b: 'TUN', why: 'Sicily to Cap Bon, 150 km' },
@@ -53,7 +53,7 @@ const SHORT_CROSSINGS: readonly SeaLink[] = [
 ]
 
 /** The Antilles, strung end to end. */
-const CARIBBEAN: readonly SeaLink[] = [
+export const CARIBBEAN: readonly SeaLink[] = [
   { a: 'USA', b: 'CUB', why: 'Florida Straits, 150 km' },
   { a: 'USA', b: 'BHS', why: 'Bimini to Florida, 90 km' },
   { a: 'BHS', b: 'CUB', why: '90 km' },
@@ -70,7 +70,7 @@ const CARIBBEAN: readonly SeaLink[] = [
 ]
 
 /** Islands with nothing nearby. Long, but each is the shortest hop that exists. */
-const OPEN_WATER: readonly SeaLink[] = [
+export const OPEN_WATER: readonly SeaLink[] = [
   { a: 'ISL', b: 'GBR', why: 'via the Faroes, 800 km' },
   // Without this the only way between Europe and the Americas is the Bering
   // Strait, which makes Russia a chokepoint in a third of all games.
@@ -91,7 +91,7 @@ const OPEN_WATER: readonly SeaLink[] = [
  * around that — the alternative is leaving eleven countries unreachable.
  * Comment out the spread below to drop the whole region.
  */
-const PACIFIC: readonly SeaLink[] = [
+export const PACIFIC: readonly SeaLink[] = [
   { a: 'PNG', b: 'SLB', why: '500 km' },
   { a: 'SLB', b: 'VUT', why: '300 km' },
   { a: 'VUT', b: 'FJI', why: '800 km' },
@@ -106,11 +106,28 @@ const PACIFIC: readonly SeaLink[] = [
   { a: 'PLW', b: 'PHL', why: '800 km' },
 ]
 
+/**
+ * Only the fixed links are switched on. A bridge or a tunnel is something you
+ * drive across, so it plays like a land border; a ferry does not, and hopping
+ * 1,500 km of open water because there is nothing closer never felt like a
+ * legal move.
+ *
+ * The cost of that is real and worth knowing: without ferries, 39 island
+ * nations have no land route to anywhere and drop out of play — Australia,
+ * New Zealand, Japan, Cuba, Madagascar, Iceland and the whole Caribbean among
+ * them. They still draw on the map, greyed out. The generator works out which
+ * countries can still host a game and refuses to build a world where a start
+ * country is unreachable, so nothing here can produce an impossible game.
+ *
+ * Uncomment a spread to bring a region back. Adding `...NARROW_STRAITS` alone
+ * returns Sri Lanka, Japan and the Bering Strait, which reconnects the
+ * Americas to Eurasia.
+ */
 export const SEA_LINKS: readonly SeaLink[] = [
   ...FIXED_LINKS,
-  ...NARROW_STRAITS,
-  ...SHORT_CROSSINGS,
-  ...CARIBBEAN,
-  ...OPEN_WATER,
-  ...PACIFIC,
+  // ...NARROW_STRAITS,
+  // ...SHORT_CROSSINGS,
+  // ...CARIBBEAN,
+  // ...OPEN_WATER,
+  // ...PACIFIC,
 ]

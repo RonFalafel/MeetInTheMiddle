@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { areNeighbours, distance } from './graph.ts'
+import { distance, sameLandmass } from './graph.ts'
 import {
   applyMove,
   checkGuess,
+  checkMove,
+  claimedBy,
+  connectingRoute,
+  countriesStillNeeded,
   gameFrom,
-  head,
   movesMade,
   newGame,
   optimalRoute,
   par,
+  replay,
   startPair,
 } from './rules.ts'
+import type { GameState, PlayerIndex } from './rules.ts'
 
 /** Deterministic RNG so start-pair tests fail the same way twice. */
 function seeded(seed: number): () => number {
@@ -23,17 +28,34 @@ function seeded(seed: number): () => number {
   }
 }
 
+/** Plays a list of countries, alternating players unless told otherwise. */
+const play = (game: GameState, codes: string[], player?: PlayerIndex): GameState =>
+  codes.reduce(
+    (state, code, index) => applyMove(state, code, player ?? ((index % 2) as PlayerIndex)),
+    game,
+  )
+
 describe('starting a game', () => {
   it('records the distance between the two starts', () => {
     const game = gameFrom('PRT', 'POL')
     expect(game.optimalDistance).toBe(distance('PRT', 'POL'))
     expect(game.status).toBe('playing')
-    expect(game.turn).toBe(0)
+    expect(game.moves).toEqual([])
+  })
+
+  it('puts both starts on the board straight away', () => {
+    expect([...claimedBy(gameFrom('PRT', 'POL')).entries()]).toEqual([
+      ['PRT', 0],
+      ['POL', 1],
+    ])
   })
 
   it('is already over if the starts touch', () => {
     expect(gameFrom('PRT', 'ESP').status).toBe('won')
-    expect(gameFrom('PRT', 'PRT').status).toBe('won')
+  })
+
+  it('refuses a pair that could never meet', () => {
+    expect(() => gameFrom('FRA', 'USA')).toThrow(/same landmass/)
   })
 
   it('reveals the route the game was hiding', () => {
@@ -44,8 +66,13 @@ describe('starting a game', () => {
     expect(route.length - 1).toBe(game.optimalDistance)
   })
 
-  it('scores par as one fewer than the gap, since meeting means bordering', () => {
+  it('scores par as one fewer than the gap', () => {
     expect(par(gameFrom('PRT', 'POL'))).toBe(distance('PRT', 'POL') - 1)
+  })
+
+  it('needs exactly par more countries before anyone has played', () => {
+    const game = gameFrom('PRT', 'POL')
+    expect(countriesStillNeeded(game)).toBe(par(game))
   })
 })
 
@@ -60,11 +87,11 @@ describe('picking start countries', () => {
     }
   })
 
-  it('honours a tighter range', () => {
-    const random = seeded(7)
-    for (let i = 0; i < 50; i++) {
-      const [a, b] = startPair({ minHops: 12, maxHops: 12, random })
-      expect(distance(a, b)).toBe(12)
+  it('never picks two countries that could not reach each other', () => {
+    const random = seeded(3)
+    for (let i = 0; i < 300; i++) {
+      const [a, b] = startPair({ random })
+      expect(sameLandmass(a, b), `${a} and ${b}`).toBe(true)
     }
   })
 
@@ -75,41 +102,42 @@ describe('picking start countries', () => {
 
   it('gives a fresh game two different starts', () => {
     const game = newGame({ random: seeded(42) })
-    expect(game.chains[0].countries).toHaveLength(1)
-    expect(game.chains[1].countries).toHaveLength(1)
-    expect(game.chains[0].countries[0]).not.toBe(game.chains[1].countries[0])
+    expect(game.starts[0]).not.toBe(game.starts[1])
     expect(game.status).toBe('playing')
   })
 })
 
-describe('checking a guess', () => {
-  const game = gameFrom('PRT', 'POL') // player 0 is in Portugal
+describe('naming a country', () => {
+  const game = gameFrom('PRT', 'POL')
 
-  it('accepts a bordering country', () => {
-    expect(checkGuess(game, 'Spain')).toEqual({ ok: true, code: 'ESP' })
+  it('accepts a country nowhere near either player', () => {
+    // The whole point of dropping the adjacency rule: Poland is 4 borders from
+    // Portugal, and Belarus touches neither start.
+    expect(checkGuess(game, 'Belarus')).toEqual({ ok: true, code: 'BLR' })
   })
 
-  it('accepts it by alias, in any casing', () => {
-    expect(checkGuess(gameFrom('MEX', 'BRA'), 'usa')).toEqual({ ok: true, code: 'USA' })
+  it('accepts an alias in any casing', () => {
+    expect(checkGuess(game, 'holland')).toEqual({ ok: true, code: 'NLD' })
   })
 
   it('rejects a country that does not exist', () => {
     expect(checkGuess(game, 'Narnia')).toMatchObject({ ok: false, reason: 'unknown-country' })
   })
 
-  it('rejects a real country that is not adjacent', () => {
-    const check = checkGuess(game, 'Japan')
-    expect(check).toMatchObject({ ok: false, reason: 'not-adjacent' })
-    if (!check.ok) expect(check.message).toContain('Portugal')
+  it('rejects an island that has no land route anywhere', () => {
+    const check = checkGuess(game, 'Australia')
+    expect(check).toMatchObject({ ok: false, reason: 'out-of-play' })
+    if (!check.ok) expect(check.message).toContain('no land border')
   })
 
-  it('rejects somewhere you have already been', () => {
-    const afterSpain = applyMove(game, 'ESP') // hands the turn to player 1
-    const backToPlayerZero = applyMove(afterSpain, 'DEU')
-    expect(checkGuess(backToPlayerZero, 'Portugal')).toMatchObject({
-      ok: false,
-      reason: 'already-visited',
-    })
+  it('rejects a country on the other landmass', () => {
+    expect(checkGuess(game, 'Brazil')).toMatchObject({ ok: false, reason: 'wrong-landmass' })
+  })
+
+  it('rejects a country already on the board, whoever put it there', () => {
+    const played = applyMove(game, 'ESP', 0)
+    expect(checkMove(played, 'ESP')).toMatchObject({ ok: false, reason: 'already-named' })
+    expect(checkMove(played, 'POL')).toMatchObject({ ok: false, reason: 'already-named' })
   })
 
   it('rejects everything once the game is won', () => {
@@ -121,90 +149,105 @@ describe('checking a guess', () => {
 })
 
 describe('making a move', () => {
-  it('extends the moving player and hands over the turn', () => {
-    const game = applyMove(gameFrom('PRT', 'POL'), 'ESP')
-    expect(game.chains[0].countries).toEqual(['PRT', 'ESP'])
-    expect(game.chains[1].countries).toEqual(['POL'])
-    expect(game.turn).toBe(1)
-    expect(head(game.chains[0])).toBe('ESP')
-  })
-
-  it('leaves the original state alone', () => {
+  it('records who named it and leaves the original state alone', () => {
     const before = gameFrom('PRT', 'POL')
-    applyMove(before, 'ESP')
-    expect(before.chains[0].countries).toEqual(['PRT'])
-    expect(before.turn).toBe(0)
+    const after = applyMove(before, 'ESP', 1)
+    expect(after.moves).toEqual([{ code: 'ESP', player: 1 }])
+    expect(claimedBy(after).get('ESP')).toBe(1)
+    expect(before.moves).toEqual([])
   })
 
-  it('throws rather than applying an illegal move', () => {
-    expect(() => applyMove(gameFrom('PRT', 'POL'), 'JPN')).toThrow(/does not border/)
-  })
-
-  it('throws on a code that is not a country', () => {
-    expect(() => applyMove(gameFrom('PRT', 'POL'), 'ZZZ')).toThrow(/not a country/)
-  })
-
-  it('takes the code that checkGuess hands back, which is how the UI drives it', () => {
-    const game = gameFrom('PRT', 'POL')
-    const check = checkGuess(game, 'spain')
-    expect(check.ok).toBe(true)
-    if (check.ok) expect(applyMove(game, check.code).chains[0].countries).toEqual(['PRT', 'ESP'])
+  it('lets one player move repeatedly, because there are no turns', () => {
+    const game = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'BEL'], 0)
+    expect(movesMade(game)).toBe(3)
+    expect(game.moves.every((move) => move.player === 0)).toBe(true)
   })
 
   it('counts every country named by either player', () => {
-    let game = gameFrom('PRT', 'POL')
-    expect(movesMade(game)).toBe(0)
-    game = applyMove(game, 'ESP')
-    game = applyMove(game, 'DEU')
+    const game = play(gameFrom('PRT', 'POL'), ['ESP', 'DEU'])
     expect(movesMade(game)).toBe(2)
+  })
+
+  it('throws rather than applying an illegal move', () => {
+    expect(() => applyMove(gameFrom('PRT', 'POL'), 'BRA', 0)).toThrow(/different landmass/)
+    expect(() => applyMove(gameFrom('PRT', 'POL'), 'ZZZ', 0)).toThrow(/not a country/)
   })
 
   it('keeps par fixed as the game goes on', () => {
     const game = gameFrom('PRT', 'POL')
-    expect(par(applyMove(game, 'ESP'))).toBe(par(game))
+    expect(par(applyMove(game, 'ESP', 0))).toBe(par(game))
   })
 })
 
 describe('meeting', () => {
-  it('ends when the two heads border each other', () => {
+  it('ends when the named countries join the two starts', () => {
+    // PRT - ESP - FRA - DEU - POL, so ESP, FRA and DEU complete the chain.
     let game = gameFrom('PRT', 'POL')
-    game = applyMove(game, 'ESP') // player 0 to ESP
-    game = applyMove(game, 'DEU') // player 1 to DEU
+    game = applyMove(game, 'ESP', 0)
+    game = applyMove(game, 'DEU', 1)
     expect(game.status).toBe('playing')
-    game = applyMove(game, 'FRA') // player 0 to FRA, which borders DEU
+    game = applyMove(game, 'FRA', 0)
     expect(game.status).toBe('won')
-    expect(areNeighbours(head(game.chains[0]), head(game.chains[1]))).toBe(true)
+    expect(movesMade(game)).toBe(3)
+    expect(movesMade(game)).toBe(par(gameFrom('PRT', 'POL')))
+  })
+
+  it('does not care who named which country', () => {
+    const game = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'DEU'], 1)
+    expect(game.status).toBe('won')
+  })
+
+  it('does not care what order they were named in', () => {
+    const forwards = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'DEU'])
+    const backwards = play(gameFrom('PRT', 'POL'), ['DEU', 'FRA', 'ESP'])
+    expect(forwards.status).toBe('won')
+    expect(backwards.status).toBe('won')
+  })
+
+  it('ignores countries that do not join anything up', () => {
+    // A perfectly legal guess that happens to be useless still costs a guess.
+    const game = play(gameFrom('PRT', 'POL'), ['UKR', 'ROU', 'BGR'])
+    expect(game.status).toBe('playing')
     expect(movesMade(game)).toBe(3)
   })
 
-  it('ends when both players stand in the same country', () => {
-    const game = applyMove(gameFrom('PRT', 'MAR'), 'ESP')
-    // Spain borders Morocco across Gibraltar, so player 0 arrives already met.
-    expect(game.status).toBe('won')
-    expect(head(game.chains[0])).toBe('ESP')
+  it('returns the route that actually connected them', () => {
+    const game = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'DEU'])
+    expect(connectingRoute(game)).toEqual(['PRT', 'ESP', 'FRA', 'DEU', 'POL'])
   })
 
-  it('does not count merely crossing an old part of the other chain', () => {
-    // Player 1 leaves Portugal; player 0 walking into Portugal later is not a
-    // meeting, because player 1 is no longer standing there.
-    let game = gameFrom('DEU', 'PRT')
-    game = applyMove(game, 'AUT') // player 0: DEU to AUT
-    game = applyMove(game, 'ESP') // player 1: PRT to ESP
-    expect(game.chains[1].countries).toEqual(['PRT', 'ESP'])
-    expect(game.status).toBe('playing')
+  it('has no connecting route while the game is still on', () => {
+    expect(connectingRoute(gameFrom('PRT', 'POL'))).toBeNull()
   })
 
-  it('is reachable in par when both players walk the optimal route', () => {
+  it('counts down the countries still needed as the gap closes', () => {
     const game = gameFrom('PRT', 'POL')
-    const route = optimalRoute(game)
-    let played = game
-    let low = 1
-    let high = route.length - 2
-    while (played.status === 'playing') {
-      played = played.turn === 0
-        ? applyMove(played, route[low++]!)
-        : applyMove(played, route[high--]!)
-    }
+    const before = countriesStillNeeded(game)
+    const after = countriesStillNeeded(applyMove(game, 'FRA', 0))
+    expect(after).toBe(before - 1)
+    expect(countriesStillNeeded(play(game, ['ESP', 'FRA', 'DEU']))).toBe(0)
+  })
+
+  it('is reachable in par by naming the optimal route', () => {
+    const game = gameFrom('PRT', 'POL')
+    const middle = optimalRoute(game).slice(1, -1)
+    const played = play(game, middle)
+    expect(played.status).toBe('won')
     expect(movesMade(played)).toBe(par(game))
+  })
+})
+
+describe('replaying a move list', () => {
+  it('rebuilds the same game, which is how a device catches up', () => {
+    const original = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'DEU'])
+    const rebuilt = replay(original.starts, original.moves)
+    expect(rebuilt).toEqual(original)
+    expect(rebuilt.status).toBe('won')
+  })
+
+  it('survives a round trip through JSON', () => {
+    const original = play(gameFrom('PRT', 'POL'), ['ESP', 'UKR'])
+    const wire = JSON.parse(JSON.stringify({ starts: original.starts, moves: original.moves }))
+    expect(replay(wire.starts, wire.moves)).toEqual(original)
   })
 })

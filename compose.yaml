@@ -1,10 +1,30 @@
 services:
-  meet:
-    build: .
-    image: meet-in-the-middle
-    container_name: meet-in-the-middle
+  web:
+    build:
+      context: .
+      target: web
+    image: meet-in-the-middle-web
+    container_name: meet-web
     restart: unless-stopped
+    depends_on:
+      - sync
     # Bound to loopback: the only way in is the Cloudflare tunnel, so the port
     # is never exposed on the VM's public interface.
     ports:
       - '127.0.0.1:8080:80'
+
+  sync:
+    build:
+      context: .
+      target: sync
+    image: meet-in-the-middle-sync
+    container_name: meet-sync
+    restart: unless-stopped
+    # No published port. Only nginx talks to it, over the compose network.
+    expose:
+      - '8081'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:8081/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
