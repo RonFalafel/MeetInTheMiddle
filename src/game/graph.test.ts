@@ -257,9 +257,9 @@ describe('name matching', () => {
   })
 
   it('only ever suggests countries you are allowed to name', () => {
-    expect(search('ger')[0]?.code).toBe('DEU')
-    expect(search('')).toEqual([])
-    expect(search('austral')).toEqual([])
-    for (const country of search('a', 8)) expect(country.component).not.toBeNull()
+    expect(search('ger', 'en')[0]?.code).toBe('DEU')
+    expect(search('', 'en')).toEqual([])
+    expect(search('austral', 'en')).toEqual([])
+    for (const country of search('a', 'en', 8)) expect(country.component).not.toBeNull()
   })
 })

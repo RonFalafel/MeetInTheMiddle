@@ -8,10 +8,13 @@
  * dropped message self-healing.
  */
 
-import type { Move, PlayerIndex } from '../src/game/rules.ts'
+import type { Move, PlayerIndex, Rejection } from '../src/game/rules.ts'
 import type { CountryCode } from '../src/game/types.ts'
 
 export type RoomCode = string
+
+/** Reasons a device cannot be in a room. The client renders these translated. */
+export type ErrorCode = 'bad-room' | 'room-full' | 'taken-over' | 'not-joined' | 'bad-message'
 
 export type ClientMessage =
   /** `token` resumes a seat this device already held, after a reconnect. */
@@ -37,8 +40,8 @@ export type ServerMessage =
   | { type: 'state'; game: GameSnapshot }
   | { type: 'partner'; here: boolean }
   /** A guess the server would not accept. Costs nothing; the board is unchanged. */
-  | { type: 'rejected'; message: string }
-  | { type: 'error'; message: string }
+  | { type: 'rejected'; rejection: Rejection }
+  | { type: 'error'; error: ErrorCode }
 
 /** Unambiguous in speech and on a phone keyboard: no O/0, I/1, or S/5. */
 const ALPHABET = 'ABCDEFGHJKLMNPQRTUVWXYZ2346789'

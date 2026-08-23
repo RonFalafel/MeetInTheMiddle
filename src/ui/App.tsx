@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { SETTINGS } from '../settings.ts'
-import { getCountry } from '../game/graph.ts'
+import { format } from '../game/languages.ts'
+import type { Strings } from '../game/languages.ts'
 import {
   claimedBy,
   connectingRoute,
@@ -14,6 +15,9 @@ import type { CountryCode } from '../game/types.ts'
 import { GuessInput } from './GuessInput.tsx'
 import { Lobby } from './Lobby.tsx'
 import { WorldMap } from './WorldMap.tsx'
+import { LanguagePicker } from './LanguagePicker.tsx'
+import { useLanguage } from './language.tsx'
+import { describeError, describeRejection } from './messages.ts'
 import { useLocalGame } from './useLocalGame.ts'
 import { useRoom } from './useRoom.ts'
 import type { Session } from './session.ts'
@@ -47,18 +51,17 @@ export default function App() {
 }
 
 function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
+  const { t, name } = useLanguage()
   const { game, me } = session
 
   if (!game) {
     return (
       <main>
-        <header>
-          <h1>Meet in the Middle</h1>
-        </header>
+        <Header />
         <section className="panel">
-          <p>{session.notice ?? 'Connecting…'}</p>
+          <p>{session.notice ? describeNotice(session.notice, t, name) : t.connecting}</p>
           <button type="button" onClick={onLeave}>
-            Back
+            {t.back}
           </button>
         </section>
       </main>
@@ -71,14 +74,7 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
 
   return (
     <main>
-      <header>
-        <h1>Meet in the Middle</h1>
-        <p className="score">
-          <strong>{movesMade(game)}</strong>
-          <span>named</span>
-          {won && <em>par {par(game)}</em>}
-        </p>
-      </header>
+      <Header game={game} />
 
       {session.roomCode && <RoomBar session={session} onLeave={onLeave} />}
 
@@ -101,13 +97,36 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
   )
 }
 
+function Header({ game }: { game?: GameState }) {
+  const { t } = useLanguage()
+
+  return (
+    <header>
+      <h1>{t.title}</h1>
+      {game && (
+        <p className="score">
+          <span>{t.score}</span>
+          <strong>{movesMade(game)}</strong>
+          {game.status === 'won' && (
+            <em>
+              {t.par} {par(game)}
+            </em>
+          )}
+        </p>
+      )}
+      <LanguagePicker />
+    </header>
+  )
+}
+
 function RoomBar({ session, onLeave }: { session: Session; onLeave: () => void }) {
+  const { t } = useLanguage()
   const [shared, setShared] = useState(false)
 
   const share = async () => {
     const url = location.href
     try {
-      if (navigator.share) await navigator.share({ title: 'Meet in the Middle', url })
+      if (navigator.share) await navigator.share({ title: t.title, url })
       else await navigator.clipboard.writeText(url)
       setShared(true)
       setTimeout(() => setShared(false), 2000)
@@ -116,56 +135,52 @@ function RoomBar({ session, onLeave }: { session: Session; onLeave: () => void }
     }
   }
 
-  const state =
-    session.connection === 'live'
-      ? session.partnerHere
-        ? 'both here'
-        : 'waiting for your partner'
-      : session.connection === 'dropped'
-        ? 'reconnecting…'
-        : 'connecting…'
+  const live = session.connection === 'live'
+  const state = live
+    ? session.partnerHere
+      ? t.bothHere
+      : t.waiting
+    : session.connection === 'dropped'
+      ? t.reconnecting
+      : t.connecting
 
   return (
     <div className="roombar">
       <span className="code">{session.roomCode}</span>
-      <span className={`state ${session.partnerHere && session.connection === 'live' ? 'ok' : ''}`}>
-        {state}
-      </span>
+      <span className={`state ${live && session.partnerHere ? 'ok' : ''}`}>{state}</span>
       <button type="button" onClick={share}>
-        {shared ? 'Copied' : 'Invite'}
+        {shared ? t.copied : t.invite}
       </button>
       <button type="button" onClick={onLeave}>
-        Leave
+        {t.leave}
       </button>
     </div>
   )
 }
 
 function Play({ session, game }: { session: Session; game: GameState }) {
+  const { t, name } = useLanguage()
   const { me, setMe, guess, notice } = session
-  const needed = countriesStillNeeded(game)
 
   return (
     <section className="panel">
       <p className="standing">
         <span className={`pip player-${me}`} />
-        You start in <strong>{getCountry(game.starts[me]).name}</strong>
+        {t.yourStart}: <strong>{name(game.starts[me])}</strong>
         {SETTINGS.showCountriesNeeded && (
-          <>
+          <em>
             {' · '}
-            <em>
-              {needed} more {needed === 1 ? 'country' : 'countries'} needed
-            </em>
-          </>
+            {t.stillNeeded}: {countriesStillNeeded(game)}
+          </em>
         )}
       </p>
 
       <GuessInput game={game} onGuess={guess} disabled={session.connection === 'dropped'} />
-      {notice && <p className="error">{notice}</p>}
+      {notice && <p className="error">{describeNotice(notice, t, name)}</p>}
 
       {setMe && (
         <div className="who">
-          <span>Guessing as</span>
+          <span>{t.guessingAs}</span>
           {([0, 1] as PlayerIndex[]).map((player) => (
             <button
               key={player}
@@ -173,7 +188,7 @@ function Play({ session, game }: { session: Session; game: GameState }) {
               className={`chip player-${player}${player === me ? ' on' : ''}`}
               onClick={() => setMe(player)}
             >
-              Player {player + 1}
+              {t.player} {player + 1}
             </button>
           ))}
         </div>
@@ -182,24 +197,33 @@ function Play({ session, game }: { session: Session; game: GameState }) {
   )
 }
 
+function describeNotice(
+  notice: NonNullable<Session['notice']>,
+  t: Strings,
+  name: (code: CountryCode) => string,
+): string {
+  return notice.kind === 'rejected'
+    ? describeRejection(notice.rejection, t, name)
+    : describeError(notice.error, t)
+}
+
 function Summary({ game, onRestart }: { game: GameState; onRestart: (() => void) | null }) {
+  const { t } = useLanguage()
   const score = movesMade(game)
   const target = par(game)
   const over = score - target
 
   return (
     <section className="panel summary">
-      <h2>You met</h2>
+      <h2>{t.youMet}</h2>
       <p className="verdict">
-        {over === 0
-          ? 'Perfect — nobody could have done it in fewer.'
-          : `${score} countries against a par of ${target}.`}
+        {over === 0 ? t.perfect : format(t.againstPar, { score, par: target })}
       </p>
-      <Route label="Your route" codes={connectingRoute(game) ?? []} />
-      {over > 0 && <Route label="Shortest possible" codes={optimalRoute(game)} />}
+      <Route label={t.yourRoute} codes={connectingRoute(game) ?? []} />
+      {over > 0 && <Route label={t.shortestRoute} codes={optimalRoute(game)} />}
       {onRestart && (
         <button type="button" className="primary" onClick={onRestart}>
-          New game
+          {t.newGame}
         </button>
       )}
     </section>
@@ -207,9 +231,12 @@ function Summary({ game, onRestart }: { game: GameState; onRestart: (() => void)
 }
 
 function Route({ label, codes }: { label: string; codes: readonly CountryCode[] }) {
+  const { name, dir } = useLanguage()
+  // The arrow has to point the way the sentence runs, or the route reads backwards.
+  const arrow = dir === 'rtl' ? ' ← ' : ' → '
   return (
     <p className="route-line">
-      <span>{label}</span> {codes.map((code) => getCountry(code).name).join(' → ')}
+      <span>{label}</span> {codes.map(name).join(arrow)}
     </p>
   )
 }
@@ -223,17 +250,20 @@ function Board({
   me: PlayerIndex
   hidePartner: boolean
 }) {
+  const { t } = useLanguage()
   const claimed = [...claimedBy(game)]
   const mine = claimed.filter(([, player]) => player === me)
   const theirs = claimed.filter(([, player]) => player !== me)
 
   return (
     <section className="board">
-      <Chips label="You" player={me} entries={mine} starts={game.starts} />
+      <Chips label={t.you} player={me} entries={mine} starts={game.starts} />
       {hidePartner ? (
-        <p className="hidden-chain">Partner has named {Math.max(0, theirs.length - 1)}, somewhere</p>
+        <p className="hidden-chain">
+          {t.partnerNamed}: {Math.max(0, theirs.length - 1)}
+        </p>
       ) : (
-        <Chips label="Partner" player={me === 0 ? 1 : 0} entries={theirs} starts={game.starts} />
+        <Chips label={t.partner} player={me === 0 ? 1 : 0} entries={theirs} starts={game.starts} />
       )}
     </section>
   )
@@ -250,6 +280,8 @@ function Chips({
   entries: [CountryCode, PlayerIndex][]
   starts: readonly CountryCode[]
 }) {
+  const { name } = useLanguage()
+
   return (
     <div className={`chips player-${player}`}>
       <h3>
@@ -258,7 +290,7 @@ function Chips({
       <ul>
         {entries.map(([code]) => (
           <li key={code} className={starts.includes(code) ? 'start' : undefined}>
-            {getCountry(code).name}
+            {name(code)}
           </li>
         ))}
       </ul>

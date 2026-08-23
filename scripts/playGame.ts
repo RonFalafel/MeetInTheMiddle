@@ -79,7 +79,7 @@ function playOneGame(): void {
     }
     const check = checkMove(game, country.code)
     if (!check.ok) {
-      console.log(`  P${player + 1}  ${guess} — rejected: ${check.message}`)
+      console.log(`  P${player + 1}  ${guess} — rejected: ${check.reason}`)
       return
     }
     game = applyMove(game, check.code, player)

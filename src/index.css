@@ -73,8 +73,8 @@ h1 {
 
 .score em {
   font-style: normal;
-  padding-left: 0.35rem;
-  border-left: 1px solid var(--border);
+  padding-inline-start: 0.35rem;
+  border-inline-start: 1px solid var(--border);
 }
 
 /* ---------------------------------------------------------------- the map */
@@ -170,7 +170,7 @@ circle.tiny.player-1 {
 
 .reset-zoom {
   position: absolute;
-  right: 0.5rem;
+  inset-inline-end: 0.5rem;
   bottom: 0.5rem;
   padding: 0.4rem 0.7rem;
   font-size: 0.8rem;
@@ -198,7 +198,7 @@ circle.tiny.player-1 {
 }
 
 .standing .pip {
-  margin-right: 0.4rem;
+  margin-inline-end: 0.4rem;
 }
 
 .standing em {
@@ -255,7 +255,7 @@ input:focus-visible {
 
 .suggestions button {
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: 0.7rem 0.6rem; /* a comfortable thumb target */
   font: inherit;
   color: var(--text);
@@ -504,4 +504,40 @@ button {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 7px;
+}
+
+/* -------------------------------------------------------------- languages */
+
+.language select {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.3rem 0.4rem;
+  max-width: 8rem;
+}
+
+.tagline {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * The map is a picture of the world, not text: it keeps its own left-to-right
+ * geometry however the page around it is flowing.
+ */
+[dir='rtl'] .map,
+[dir='rtl'] .roombar .code {
+  direction: ltr;
 }

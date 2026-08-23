@@ -3,7 +3,7 @@ import { replay } from '../game/rules.ts'
 import type { GameState, PlayerIndex } from '../game/rules.ts'
 import type { CountryCode } from '../game/types.ts'
 import type { ClientMessage, ServerMessage } from '../../server/protocol.ts'
-import type { Session } from './session.ts'
+import type { Notice, Session } from './session.ts'
 
 const RECONNECT_DELAY_MS = 1500
 
@@ -23,7 +23,7 @@ export function useRoom(room: string | null): Session {
   const [me, setMe] = useState<PlayerIndex>(0)
   const [connection, setConnection] = useState<Session['connection']>('connecting')
   const [partnerHere, setPartnerHere] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
 
   const socket = useRef<WebSocket | null>(null)
   const retry = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,11 +76,11 @@ export function useRoom(room: string | null): Session {
             setPartnerHere(message.here)
             break
           case 'rejected':
-            setNotice(message.message)
+            setNotice({ kind: 'rejected', rejection: message.rejection })
             break
           case 'error':
             rejected.current = true
-            setNotice(message.message)
+            setNotice({ kind: 'error', error: message.error })
             setConnection('dropped')
             break
         }

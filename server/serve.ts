@@ -64,18 +64,18 @@ export function start(port: number, heartbeatMs = HEARTBEAT_MS): Promise<Server>
     if (message.type === 'join') {
       const code = normaliseRoomCode(message.room)
       if (!code) {
-        send(socket, { type: 'error', message: 'That room code does not look right.' })
+        send(socket, { type: 'error', error: 'bad-room' })
         return
       }
 
       const result = rooms.join(code, message.token, socket)
       if (!result.ok) {
-        send(socket, { type: 'error', message: result.message })
+        send(socket, { type: 'error', error: result.error })
         return
       }
 
       if (result.displaced) {
-        send(result.displaced, { type: 'error', message: 'You opened this game somewhere else.' })
+        send(result.displaced, { type: 'error', error: 'taken-over' })
         attachments.delete(result.displaced)
         result.displaced.close()
       }
@@ -97,14 +97,14 @@ export function start(port: number, heartbeatMs = HEARTBEAT_MS): Promise<Server>
 
     const attachment = attachments.get(socket)
     if (!attachment) {
-      send(socket, { type: 'error', message: 'Join a room first.' })
+      send(socket, { type: 'error', error: 'not-joined' })
       return
     }
 
     if (message.type === 'guess') {
       const result = rooms.guess(attachment.room, attachment.player, message.code)
       if (!result.ok) {
-        send(socket, { type: 'rejected', message: result.message })
+        send(socket, { type: 'rejected', rejection: result })
         return
       }
       broadcast(attachment.room, { type: 'state', game: snapshot(attachment.room.game) })
@@ -128,7 +128,7 @@ export function start(port: number, heartbeatMs = HEARTBEAT_MS): Promise<Server>
       try {
         message = JSON.parse(String(raw)) as ClientMessage
       } catch {
-        send(socket, { type: 'error', message: 'Could not read that message.' })
+        send(socket, { type: 'error', error: 'bad-message' })
         return
       }
       handle(socket, message)

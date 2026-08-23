@@ -207,9 +207,21 @@ export type IllegalReason =
   | 'wrong-landmass'
   | 'already-named'
 
-export type MoveCheck =
-  | { readonly ok: true; readonly code: CountryCode }
-  | { readonly ok: false; readonly reason: IllegalReason; readonly message: string }
+/**
+ * A refusal carries the reason and what it was about, not a finished sentence.
+ * The screen has to say this in the reader's language, and the server has to
+ * put it on the wire, so neither can be handed English prose.
+ */
+export type Rejection = {
+  readonly ok: false
+  readonly reason: IllegalReason
+  /** The country refused, when the guess resolved to one. */
+  readonly country?: CountryCode
+  /** What the player typed, when it resolved to nothing. */
+  readonly text?: string
+}
+
+export type MoveCheck = { readonly ok: true; readonly code: CountryCode } | Rejection
 
 /**
  * Validates a country against the board. There is no adjacency rule and no
@@ -217,61 +229,30 @@ export type MoveCheck =
  * Rejections are free — none of them cost a guess.
  */
 export function checkMove(state: GameState, code: CountryCode): MoveCheck {
-  if (state.status === 'won') {
-    return { ok: false, reason: 'game-over', message: 'You already met.' }
-  }
-  if (!exists(code)) {
-    return { ok: false, reason: 'unknown-country', message: `${code} is not a country in this game.` }
-  }
-
-  const country = getCountry(code)
-
-  if (!isPlayable(code)) {
-    return {
-      ok: false,
-      reason: 'out-of-play',
-      message: `${country.name} has no land border with anywhere, so it is not in this game.`,
-    }
-  }
+  if (state.status === 'won') return { ok: false, reason: 'game-over' }
+  if (!exists(code)) return { ok: false, reason: 'unknown-country', text: code }
+  if (!isPlayable(code)) return { ok: false, reason: 'out-of-play', country: code }
   if (!sameLandmass(code, state.starts[0])) {
-    return {
-      ok: false,
-      reason: 'wrong-landmass',
-      message: `${country.name} is on a different landmass — you could never walk there.`,
-    }
+    return { ok: false, reason: 'wrong-landmass', country: code }
   }
-  if (claimedCodes(state).has(code)) {
-    return {
-      ok: false,
-      reason: 'already-named',
-      message: `${country.name} is already on the board.`,
-    }
-  }
+  if (claimedCodes(state).has(code)) return { ok: false, reason: 'already-named', country: code }
 
   return { ok: true, code }
 }
 
 /** What a player typed, checked. Quotes them back when the name means nothing. */
 export function checkGuess(state: GameState, guess: string): MoveCheck {
-  if (state.status === 'won') {
-    return { ok: false, reason: 'game-over', message: 'You already met.' }
-  }
+  if (state.status === 'won') return { ok: false, reason: 'game-over' }
 
   const country = findByName(guess)
-  if (!country) {
-    return {
-      ok: false,
-      reason: 'unknown-country',
-      message: `"${guess.trim()}" is not a country in this game.`,
-    }
-  }
+  if (!country) return { ok: false, reason: 'unknown-country', text: guess.trim() }
   return checkMove(state, country.code)
 }
 
 /** Applies a legal move. Throws if it is not one, so check first. */
 export function applyMove(state: GameState, code: CountryCode, player: PlayerIndex): GameState {
   const check = checkMove(state, code)
-  if (!check.ok) throw new Error(check.message)
+  if (!check.ok) throw new Error(`${code}: ${check.reason}`)
 
   const next: GameState = { ...state, moves: [...state.moves, { code: check.code, player }] }
   return { ...next, status: connectingRoute(next) ? 'won' : 'playing' }

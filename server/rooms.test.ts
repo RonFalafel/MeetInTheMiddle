@@ -8,7 +8,7 @@ const socket = (name: string) => ({ name })
 
 const seatIn = (rooms: Rooms<object>, code: string, connection: object, token?: string) => {
   const result = rooms.join(code, token, connection)
-  if (!result.ok) throw new Error(result.message)
+  if (!result.ok) throw new Error(result.error)
   return result
 }
 

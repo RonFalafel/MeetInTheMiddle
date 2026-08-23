@@ -1,4 +1,5 @@
-import type { GameState, PlayerIndex } from '../game/rules.ts'
+import type { GameState, PlayerIndex, Rejection } from '../game/rules.ts'
+import type { ErrorCode } from '../../server/protocol.ts'
 import type { CountryCode } from '../game/types.ts'
 
 /**
@@ -16,6 +17,10 @@ export type Session = {
   readonly connection: 'local' | 'connecting' | 'live' | 'dropped'
   readonly roomCode: string | null
   readonly partnerHere: boolean
-  /** A message from the server worth showing — a refusal, or why the join failed. */
-  readonly notice: string | null
+  /** Something worth showing — a refused guess, or why the room would not take us. */
+  readonly notice: Notice | null
 }
+
+export type Notice =
+  | { readonly kind: 'rejected'; readonly rejection: Rejection }
+  | { readonly kind: 'error'; readonly error: ErrorCode }

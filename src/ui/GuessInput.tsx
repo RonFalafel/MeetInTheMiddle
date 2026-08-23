@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import { search } from '../game/graph.ts'
+import { useLanguage } from './language.tsx'
 import { checkGuess } from '../game/rules.ts'
-import type { GameState } from '../game/rules.ts'
+import { describeRejection } from './messages.ts'
+import type { GameState, Rejection } from '../game/rules.ts'
 import type { Country, CountryCode } from '../game/types.ts'
 
 export type GuessInputProps = {
@@ -11,17 +13,18 @@ export type GuessInputProps = {
 }
 
 export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
+  const { t, language, name } = useLanguage()
   const [text, setText] = useState('')
   const [highlighted, setHighlighted] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Rejection | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const suggestions: Country[] = text.trim() ? search(text) : []
+  const suggestions: Country[] = text.trim() ? search(text, language) : []
 
   const submit = (guess: string) => {
     const check = checkGuess(game, guess)
     if (!check.ok) {
-      setError(check.message)
+      setError(check)
       return
     }
     setText('')
@@ -42,7 +45,8 @@ export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      submit(suggestions[highlighted]?.name ?? text)
+      const chosen = suggestions[highlighted]
+      submit(chosen ? name(chosen.code) : text)
       return
     }
     if (event.key === 'Escape') setText('')
@@ -54,8 +58,8 @@ export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
         ref={inputRef}
         value={text}
         disabled={disabled}
-        placeholder="Name any country"
-        aria-label="Name a country"
+        placeholder={t.guessPlaceholder}
+        aria-label={t.guessPlaceholder}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="words"
@@ -80,17 +84,17 @@ export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
                 // which on a phone closes the keyboard and jumps the layout.
                 onPointerDown={(event) => {
                   event.preventDefault()
-                  submit(country.name)
+                  submit(name(country.code))
                 }}
               >
-                {country.name}
+                {name(country.code)}
               </button>
             </li>
           ))}
         </ul>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{describeRejection(error, t, name)}</p>}
     </div>
   )
 }

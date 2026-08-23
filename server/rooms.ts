@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { SETTINGS } from '../src/settings.ts'
 import { applyMove, checkMove, newGame } from '../src/game/rules.ts'
-import type { GameState, PlayerIndex } from '../src/game/rules.ts'
+import type { GameState, PlayerIndex, Rejection } from '../src/game/rules.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import { makeRoomCode } from './protocol.ts'
 import type { GameSnapshot, RoomCode } from './protocol.ts'
@@ -42,7 +42,7 @@ export type JoinResult<Connection> =
       /** A device that was holding this seat and has just been replaced. */
       displaced?: Connection
     }
-  | { ok: false; message: string }
+  | { ok: false; error: 'room-full' }
 
 const startGame = () => newGame({ minHops: SETTINGS.minHops, maxHops: SETTINGS.maxHops })
 
@@ -103,7 +103,7 @@ export class Rooms<Connection> {
     }
 
     const free = room.seats.findIndex((seat) => seat === null || this.abandoned(seat))
-    if (free === -1) return { ok: false, message: 'That room already has two players.' }
+    if (free === -1) return { ok: false, error: 'room-full' }
 
     // A reclaimed seat gets a new token, so the old device cannot wander back
     // in and find itself sharing a seat with someone else.
@@ -127,9 +127,9 @@ export class Rooms<Connection> {
     return seat.connection === null && seat.freeSince !== null && Date.now() - seat.freeSince > this.seatGraceMs
   }
 
-  guess(room: Room<Connection>, player: PlayerIndex, code: CountryCode): { ok: true } | { ok: false; message: string } {
+  guess(room: Room<Connection>, player: PlayerIndex, code: CountryCode): { ok: true } | Rejection {
     const check = checkMove(room.game, code)
-    if (!check.ok) return { ok: false, message: check.message }
+    if (!check.ok) return check
 
     room.game = applyMove(room.game, check.code, player)
     room.touchedAt = Date.now()

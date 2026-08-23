@@ -125,9 +125,11 @@ describe('naming a country', () => {
   })
 
   it('rejects an island that has no land route anywhere', () => {
-    const check = checkGuess(game, 'Australia')
-    expect(check).toMatchObject({ ok: false, reason: 'out-of-play' })
-    if (!check.ok) expect(check.message).toContain('no land border')
+    expect(checkGuess(game, 'Australia')).toMatchObject({
+      ok: false,
+      reason: 'out-of-play',
+      country: 'AUS',
+    })
   })
 
   it('rejects a country on the other landmass', () => {
@@ -169,8 +171,8 @@ describe('making a move', () => {
   })
 
   it('throws rather than applying an illegal move', () => {
-    expect(() => applyMove(gameFrom('PRT', 'POL'), 'BRA', 0)).toThrow(/different landmass/)
-    expect(() => applyMove(gameFrom('PRT', 'POL'), 'ZZZ', 0)).toThrow(/not a country/)
+    expect(() => applyMove(gameFrom('PRT', 'POL'), 'BRA', 0)).toThrow(/wrong-landmass/)
+    expect(() => applyMove(gameFrom('PRT', 'POL'), 'ZZZ', 0)).toThrow(/unknown-country/)
   })
 
   it('keeps par fixed as the game goes on', () => {

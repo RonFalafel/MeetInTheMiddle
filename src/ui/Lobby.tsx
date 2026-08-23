@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { makeRoomCode, normaliseRoomCode } from '../../server/protocol.ts'
+import { LanguagePicker } from './LanguagePicker.tsx'
+import { useLanguage } from './language.tsx'
 
 export type LobbyProps = {
   readonly onPlayHere: () => void
@@ -7,13 +9,14 @@ export type LobbyProps = {
 }
 
 export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
+  const { t } = useLanguage()
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const join = () => {
     const room = normaliseRoomCode(code)
     if (!room) {
-      setError('Room codes are four characters.')
+      setError(t.codeError)
       return
     }
     onOpenRoom(room)
@@ -21,33 +24,33 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
 
   return (
     <main className="lobby">
-      <div className="lobby-intro">
-        <h1>Meet in the Middle</h1>
-        <p>
-          You and your partner start in two secret countries. Name countries —
-          any country, in any order — until your two sides join up. Fewest
-          countries wins.
-        </p>
-      </div>
+      <header>
+        <h1>{t.title}</h1>
+        <LanguagePicker />
+      </header>
+
+      <p className="tagline">{t.tagline}</p>
 
       <section className="panel">
-        <h2>Two phones</h2>
-        <p className="muted">One of you starts a game and sends the other the link.</p>
+        <h2>{t.twoPhones}</h2>
+        <p className="muted">{t.twoPhonesHint}</p>
         <button type="button" className="primary" onClick={() => onOpenRoom(makeRoomCode())}>
-          Start a game
+          {t.startGame}
         </button>
 
         <div className="join">
           <input
             value={code}
-            placeholder="Or enter a code"
-            aria-label="Room code"
+            placeholder={t.codePlaceholder}
+            aria-label={t.codePlaceholder}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="characters"
             spellCheck={false}
             enterKeyHint="go"
             maxLength={5}
+            // The code is always Latin, whatever language the game is in.
+            dir="ltr"
             onChange={(event) => {
               setCode(event.target.value)
               setError(null)
@@ -55,17 +58,17 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
             onKeyDown={(event) => event.key === 'Enter' && join()}
           />
           <button type="button" onClick={join}>
-            Join
+            {t.join}
           </button>
         </div>
         {error && <p className="error">{error}</p>}
       </section>
 
       <section className="panel">
-        <h2>One device</h2>
-        <p className="muted">Pass it back and forth, or play both sides yourself.</p>
+        <h2>{t.oneDevice}</h2>
+        <p className="muted">{t.oneDeviceHint}</p>
         <button type="button" onClick={onPlayHere}>
-          Play here
+          {t.playHere}
         </button>
       </section>
     </main>

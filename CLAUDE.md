@@ -1,10 +1,13 @@
 # Meet in the Middle
 
-Two-player cooperative geography game, played from two phones at once. How the
-rules and the data pipeline actually work is in `README.md` — read it before
-changing anything about countries, rules or rooms. `Specs/SPEC.md` is the
-original design sketch and is now out of date in places: it describes a
-turn-based game with adjacency rules, which this no longer is.
+Two-player cooperative geography game, played from two phones at once.
+
+- `README.md` — how to run it, how the data pipeline works, how to deploy.
+- `Specs/SPEC.md` — the game as it currently is. Keep it current: if a rule
+  changes, change it there in the same commit.
+- `Specs/DECISIONS.md` — why it is that way, in date order. Add an entry when a
+  decision is worth not re-litigating later, and amend the old entry rather
+  than contradicting it silently.
 
 ## Stack
 
@@ -15,10 +18,10 @@ No router, no state library, no database.
 ## Shape of the code
 
 - `src/game/` — pure functions, no React and no Node imports. The graph, the
-  rules, and the three hand-curated tables (`playSet.ts`, `seaLinks.ts`,
-  `names.ts`).
-- `src/game/data/countries.generated.ts` — generated. Never edit it; change a
-  curation table and run `npm run graph`.
+  rules, the language tables, and the three hand-curated data tables
+  (`playSet.ts`, `seaLinks.ts`, `names.ts`).
+- `src/game/data/*.generated.ts` — generated. Never edit them; change a curation
+  table and run `npm run graph`.
 - `src/ui/` — rendering. `useLocalGame` and `useRoom` both return the same
   `Session`, so the screen never knows whether the game is local or networked.
 - `server/` — rooms and the WebSocket protocol. Imports `src/game/rules.ts`
@@ -56,3 +59,9 @@ testable without a browser — see `server/serve.test.ts`.
 - Comment the geography and the protocol decisions, not the code. A merged
   territory, a sea crossing or a seat-reclaim rule deserves a line saying why;
   a `for` loop does not.
+- Player-facing text is never built in `src/game/rules.ts` or `server/`. Both
+  return a reason and a country code; only `src/ui/` turns that into a
+  sentence, because the two players may be reading different languages.
+- Adding a language: a row in `LANGUAGES`, its `Strings` block, then
+  `npm run graph`. Country names come from CLDR, so only the interface text is
+  hand-written.

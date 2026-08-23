@@ -1,4 +1,7 @@
 import { COUNTRIES } from './data/countries.generated.ts'
+import { NAMES, NAME_ALIASES } from './data/names.generated.ts'
+import { LANGUAGE_CODES } from './languages.ts'
+import type { LanguageCode } from './languages.ts'
 import type { Country, CountryCode } from './types.ts'
 
 export const COUNTRY_LIST: readonly Country[] = COUNTRIES
@@ -70,27 +73,52 @@ export function distance(from: CountryCode, to: CountryCode): number {
   return shortestPath(from, to).length - 1
 }
 
-/** Lowercase, strip accents and punctuation, so "cote d'ivoire" matches "Côte d'Ivoire". */
+/**
+ * Lowercase, then drop combining marks and everything that is not a letter or
+ * a digit — in any script, which is the point. It makes "cote divoire" match
+ * "Côte d'Ivoire", "צכיה" match "צ׳כיה" by dropping the geresh, and Arabic
+ * hamza variants match each other, since NFD splits أ into ا plus a mark.
+ */
 export function normalise(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
 }
 
-const byNormalisedName = new Map<string, Country>()
-for (const country of COUNTRIES) {
-  byNormalisedName.set(normalise(country.name), country)
-  for (const alias of country.aliases) {
-    // A real name always wins over another country's alias.
-    if (!byNormalisedName.has(normalise(alias))) byNormalisedName.set(normalise(alias), country)
+export function countryName(code: CountryCode, language: LanguageCode): string {
+  return NAMES[language][code] ?? getCountry(code).name
+}
+
+function namesFor(country: Country, language: LanguageCode): string[] {
+  return [NAMES[language][country.code] ?? country.name, ...(NAME_ALIASES[language][country.code] ?? [])]
+}
+
+/**
+ * Every spelling of every country in every language, pointing at the country.
+ *
+ * Matching deliberately ignores which language the player has chosen: two
+ * people reading the game in different languages still share one board, and
+ * neither should be told their own word for Germany is wrong.
+ */
+const byAnyName = new Map<string, Country>()
+for (const pass of ['names', 'aliases'] as const) {
+  for (const country of COUNTRIES) {
+    for (const language of LANGUAGE_CODES) {
+      const [name, ...aliases] = namesFor(country, language)
+      for (const spelling of pass === 'names' ? [name!] : aliases) {
+        const key = normalise(spelling)
+        // First writer wins, and a real name always beats another country's alias.
+        if (key && !byAnyName.has(key)) byAnyName.set(key, country)
+      }
+    }
   }
 }
 
-/** Exact match on a name or alias, ignoring case, spacing and accents. */
+/** Exact match on a name or alias in any language, ignoring case and accents. */
 export function findByName(text: string): Country | undefined {
-  return byNormalisedName.get(normalise(text))
+  return byAnyName.get(normalise(text))
 }
 
 /**
@@ -105,20 +133,34 @@ export function resolveCountry(text: string): Country | undefined {
 }
 
 /**
- * Names and aliases beginning with the typed text, best for an autocomplete.
- * Only suggests countries that are in play — offering Australia when Australia
- * can never be part of a route is just a trap.
+ * Names beginning with the typed text, best for an autocomplete.
+ *
+ * Suggestions are ranked by the reader's own language but matched against all
+ * of them, so typing in a language other than the one on screen still works.
+ * Only countries in play are offered — suggesting Australia when Australia can
+ * never be part of a route is just a trap.
  */
-export function search(text: string, limit = 8): Country[] {
+export function search(text: string, language: LanguageCode, limit = 8): Country[] {
   const needle = normalise(text)
   if (!needle) return []
+
   const starts: Country[] = []
   const contains: Country[] = []
+  const otherLanguage: Country[] = []
+
   for (const country of COUNTRIES) {
     if (country.component === null) continue
-    const haystacks = [country.name, ...country.aliases].map(normalise)
-    if (haystacks.some((h) => h.startsWith(needle))) starts.push(country)
-    else if (haystacks.some((h) => h.includes(needle))) contains.push(country)
+
+    const own = namesFor(country, language).map(normalise)
+    if (own.some((name) => name.startsWith(needle))) starts.push(country)
+    else if (own.some((name) => name.includes(needle))) contains.push(country)
+    else if (
+      LANGUAGE_CODES.some((other) =>
+        other === language ? false : namesFor(country, other).some((name) => normalise(name).startsWith(needle)),
+      )
+    ) {
+      otherLanguage.push(country)
+    }
   }
-  return [...starts, ...contains].slice(0, limit)
+  return [...starts, ...contains, ...otherLanguage].slice(0, limit)
 }

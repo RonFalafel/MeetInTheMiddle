@@ -1,97 +1,122 @@
 # Meet in the Middle — game spec
 
-A cooperative geography game for two people. Both players are trying to reach
-each other across the world map by naming bordering countries.
+A cooperative geography game for two people, built to be played from two phones
+in the same room, out loud.
+
+This describes the game **as it is**, not as it was first imagined. When the
+built game and this file disagree, the game is right and this file is stale —
+fix it. The reasoning behind each rule is in [DECISIONS.md](DECISIONS.md).
 
 ## Core loop
 
-1. Each player is given a different secret start country.
-2. On each turn, both players name one country that borders their own current
-   chain head. That country is appended to their chain.
-3. The game ends when the two chains touch — either the players land on the
-   same country, or their two chain heads border each other.
-4. Score is the total number of countries named by both players combined.
-   Lower is better.
+1. Each player is given a different secret start country. Both starts are
+   always on the same landmass.
+2. Either player, at any time, names any country. There are no turns and no
+   adjacency requirement.
+3. Every named country goes on the shared board, coloured by who named it.
+4. The game ends when the named countries form an unbroken chain of land
+   borders from one start to the other.
+5. Score is the total number of countries named. Lower is better. Par is one
+   fewer than the number of borders between the two starts.
 
-The tension: you don't know where your partner started, so early moves are a
-guess about where they're coming from. Late moves become a negotiation.
+The tension: you don't know where your partner started, so early guesses are a
+bet on where they might be coming from. The **still needed** counter — the
+shortest number of countries that would still complete the chain — is the only
+signal you get, and it is what makes a distant guess worth trying.
 
-## Undecided — resolve by playing, not by arguing
+A guess that joins nothing up is perfectly legal and still costs a point. A
+guess that is refused costs nothing.
 
-These are deliberately open. Build the first one, play it, then change it.
+## Rejections
 
-- **Do you see your partner's chain?** Visible is friendlier and probably more
-  fun for a couple; hidden is tenser and makes it a real deduction game.
-  Build it visible first, but keep it behind a flag so it can be flipped.
-- **Any communication allowed?** Sitting on a sofa, you'll talk regardless. The
-  question is whether the game should lean into that or forbid it.
-- **What happens on an invalid guess?** Free retry, or a scoring penalty.
-- **Start distance.** Countries should be far enough apart to be interesting.
-  Pick starts with a shortest path between 5 and 9 hops, tunable.
+Refusals are free and always explain themselves:
 
-## v1 scope — hotseat, one device, no server
+| Reason | When |
+| --- | --- |
+| `unknown-country` | Not a country the game knows, in any language |
+| `out-of-play` | An island with no land route anywhere — Australia, Japan, Cuba |
+| `wrong-landmass` | A real country, but it could never connect to your start |
+| `already-named` | Already on the board, whoever put it there |
+| `game-over` | You already met |
 
-Everything runs locally in the browser. Two players share a phone or laptop and
-pass it back and forth. This proves whether the game is fun before any sync
-code exists.
+These are returned as a reason plus a country code, never as English prose, so
+each device can render them in its own language.
 
-- Random start pair each game (no dailies, no seeds, no calendar)
-- Country autocomplete input
-- World map with both chains drawn in different colours
-- Move counter and an end-of-game summary
-- The optimal solution revealed at the end, so you can see how you did
-- State in memory only; a page refresh starts a new game
+## Borders
 
-Explicitly NOT in v1: accounts, rooms, persistence, sharing, leaderboards,
-sound, animation beyond a basic transition, difficulty settings.
+Only land borders count. Bridges and tunnels you can drive across count as
+land; ferries and open water do not.
 
-## v2 — two devices
+The consequence is that the world is not one connected graph. There are two
+playable landmasses:
 
-A room code pairs two phones. Each player sees the map and their own input;
-guesses relay between them in real time.
+| | countries |
+| --- | --- |
+| Afro-Eurasia | 135 |
+| The Americas | 22 |
+| Out of play — no land route anywhere | 39 |
 
-- Single Cloudflare Worker with a Durable Object per room, or Supabase realtime
-- Room state is just: two chains, two start countries, a move counter
-- No accounts. Room codes expire after a few hours.
-- Reconnect handling: rejoining with the same room code restores state
+Islands still draw on the map, greyed out. They can never be a start, are never
+suggested, and are refused with a reason. Both starts always come from the same
+landmass, so a game can never be unwinnable — the generator refuses to build a
+world where that is possible.
+
+## Languages
+
+Ten: English, Hebrew, Arabic, Spanish, French, German, Italian, Dutch,
+Portuguese, Russian. Hebrew and Arabic lay the page out right to left.
+
+Country names come from CLDR at build time. Interface text is hand-written in
+`src/game/languages.ts`.
+
+**Guess matching ignores the chosen language.** Two people reading the game in
+different languages share one board, and neither should be told their own word
+for Germany is wrong.
 
 ## Data model
 
 ```ts
-type CountryCode = string; // ISO 3166-1 alpha-3
+type CountryCode = string // ISO 3166-1 alpha-3, or X-prefixed where ISO has none
 
-type Adjacency = Map<CountryCode, Set<CountryCode>>;
-
-type Chain = {
-  player: 0 | 1;
-  countries: CountryCode[]; // index 0 is the secret start
-};
+type Move = { code: CountryCode; player: 0 | 1 }
 
 type GameState = {
-  chains: [Chain, Chain];
-  turn: 0 | 1;
-  status: "playing" | "won";
-  optimalDistance: number; // shortest path between the two starts
-};
+  starts: readonly [CountryCode, CountryCode]
+  moves: readonly Move[]
+  status: 'playing' | 'won'
+  optimalDistance: number // borders between the two starts
+}
 ```
 
-## Build order
+Everything else is derived. A game is a start pair plus a move list, which is
+what makes it trivially serialisable — two devices stay in sync by agreeing on
+that and nothing else, and a reconnecting phone catches up by replaying it.
 
-Each step should end green and committed before the next one starts.
+## Two devices
 
-1. **Graph.** Script that reads the TopoJSON, derives land adjacency from
-   shared arcs, merges the sea-link table, writes a JSON artifact. Tests for
-   all the invariants in `CLAUDE.md`. No UI at all yet.
-2. **Rules.** Pure functions: `startPair(minHops, maxHops)`, `isLegalMove`,
-   `applyMove`, `hasMet`, `shortestPath`. Fully unit tested. Still no UI.
-3. **Headless game.** A script that plays a full game from a scripted list of
-   moves and prints the result. This is the point where the game either works
-   or doesn't, and it costs nothing to change.
-4. **Map.** Render the world, colour the two chains, no interaction.
-5. **Input.** Autocomplete, validation, turn handoff.
-6. **Play it.** With a real second person. Change the rules based on what
-   happened, not on what seemed sensible in step 2.
+A four-character room code, carried in the URL so it can be shared as a link.
+Rooms live in memory on the sync server, hold two seats, and expire after six
+hours. The server is authoritative and imports the same rules module the
+browser does.
 
-Steps 1–3 are where the leverage is: pure logic, fully verifiable without a
-human looking at a screen. Don't skip ahead to the map because it's the fun
-part.
+A device keeps its seat through a token in `localStorage` and reclaims it on
+reconnect. A seat nobody returns to opens up after a minute, so a lost token
+cannot permanently brick a room.
+
+## Still undecided — resolve by playing
+
+- **Do you see your partner's countries?** Visible today. Hidden makes it a
+  real deduction game. `SETTINGS.showPartnerCountries`.
+- **Should the still-needed counter exist?** It is a strong hint, and without
+  it a far-flung guess is pure blind luck. `SETTINGS.showCountriesNeeded`.
+- **Start distance.** 5 to 9 borders apart today.
+- **Should a useless guess cost anything?** It costs one point today, the same
+  as a useful one.
+- **Ferries.** All disabled. `src/game/seaLinks.ts` has them grouped and
+  commented out; uncommenting `NARROW_STRAITS` alone would put Japan, Sri Lanka
+  and the Bering Strait back and reconnect the Americas to Eurasia.
+
+## Not built, and not obviously wanted
+
+Accounts, persistence beyond a room's six hours, leaderboards, dailies, seeds,
+sound, more than two players.

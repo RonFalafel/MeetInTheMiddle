@@ -9,8 +9,8 @@ There are no turns. Either of you can name a country whenever you think of one,
 which is the point: it is meant to be played out loud, at the same time, from
 two phones.
 
-Game design notes are in [Specs/SPEC.md](Specs/SPEC.md), though the rules have
-moved on from what is written there.
+[Specs/SPEC.md](Specs/SPEC.md) is the game as it currently stands;
+[Specs/DECISIONS.md](Specs/DECISIONS.md) is why.
 
 ## Running it
 
@@ -51,6 +51,22 @@ npm run sync
 The knobs worth arguing about live in [src/settings.ts](src/settings.ts): how
 far apart the starts are, whether you can see your partner's countries, and
 whether the game tells you how many more countries are needed.
+
+## Languages
+
+Ten: English, עברית, العربية, Español, Français, Deutsch, Italiano, Nederlands,
+Português, Русский. The picker is in the header; the choice is remembered, and
+a new visitor gets their phone's language if the game speaks it. Hebrew and
+Arabic lay the page out right to left.
+
+Country names come from CLDR via `Intl.DisplayNames` at build time. Interface
+text is hand-written in [`src/game/languages.ts`](src/game/languages.ts), which
+is also the whole cost of adding a language — add a row to `LANGUAGES`, write
+its `Strings`, run `npm run graph`.
+
+**Guesses are matched against every language at once**, whichever one is on
+screen. One of you can read the game in Hebrew and the other in English and
+you can both type into the same board.
 
 ## Two phones
 

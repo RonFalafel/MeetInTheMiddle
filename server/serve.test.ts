@@ -124,7 +124,10 @@ describe('two devices in a room', () => {
     const two = await join('AAAD')
 
     one.client.send({ type: 'guess', code: 'AUS' }) // an island, never in play
-    expect((await one.client.next('rejected')).message).toContain('no land border')
+    expect((await one.client.next('rejected')).rejection).toMatchObject({
+      reason: 'out-of-play',
+      country: 'AUS',
+    })
 
     await expect(two.client.next('state', 300)).rejects.toThrow(/no "state"/)
 
@@ -176,7 +179,7 @@ describe('coming back', () => {
 
     const third = await Client.connect(server.port)
     third.send({ type: 'join', room: 'AABB' })
-    expect((await third.next('error')).message).toContain('two players')
+    expect((await third.next('error')).error).toBe('room-full')
 
     await third.close()
     await one.client.close()
@@ -186,14 +189,14 @@ describe('coming back', () => {
   it('rejects a room code that is not one', async () => {
     const client = await Client.connect(server.port)
     client.send({ type: 'join', room: 'nope!' })
-    expect((await client.next('error')).message).toContain('does not look right')
+    expect((await client.next('error')).error).toBe('bad-room')
     await client.close()
   })
 
   it('refuses a guess from a device that never joined', async () => {
     const client = await Client.connect(server.port)
     client.send({ type: 'guess', code: 'FRA' })
-    expect((await client.next('error')).message).toContain('Join a room first')
+    expect((await client.next('error')).error).toBe('not-joined')
     await client.close()
   })
 })
