@@ -139,9 +139,14 @@ hostname to the cloudflared config:
 ```yaml
 ingress:
   - hostname: meet.ronfalafel.com
-    service: http://localhost:8080
+    service: http://localhost:8090
   - service: http_status:404
 ```
+
+The host port defaults to **8090** and is set by `MEET_PORT`, so if something
+else on the VM already has it, put `MEET_PORT=8123` in a `.env` file next to
+`compose.yaml` and point the ingress rule at the same number. Find what is
+holding a port with `sudo ss -ltnp | grep <port>`.
 
 Then point DNS at the tunnel once:
 

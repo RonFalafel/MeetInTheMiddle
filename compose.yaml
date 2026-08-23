@@ -10,8 +10,11 @@ services:
       - sync
     # Bound to loopback: the only way in is the Cloudflare tunnel, so the port
     # is never exposed on the VM's public interface.
+    #
+    # Override with MEET_PORT if something else on the host already has this
+    # one — the cloudflared ingress rule has to match whatever you pick.
     ports:
-      - '127.0.0.1:8080:80'
+      - '127.0.0.1:${MEET_PORT:-8090}:80'
 
   sync:
     build:
