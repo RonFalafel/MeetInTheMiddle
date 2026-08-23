@@ -1,0 +1,10 @@
+services:
+  meet:
+    build: .
+    image: meet-in-the-middle
+    container_name: meet-in-the-middle
+    restart: unless-stopped
+    # Bound to loopback: the only way in is the Cloudflare tunnel, so the port
+    # is never exposed on the VM's public interface.
+    ports:
+      - '127.0.0.1:8080:80'
