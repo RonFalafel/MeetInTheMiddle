@@ -3,8 +3,13 @@ import { WebSocket } from 'ws'
 import { start } from './serve.ts'
 import type { Server } from './serve.ts'
 import type { ClientMessage, ServerMessage } from './protocol.ts'
-import { replay } from '../src/game/rules.ts'
-import { optimalRoute } from '../src/game/rules.ts'
+import { fromSnapshot, optimalRoute, replay } from '../src/game/rules.ts'
+import type { GameRequest, GameState, MeetGame } from '../src/game/rules.ts'
+
+const meet = (game: GameState): MeetGame => {
+  if (game.mode !== 'meet') throw new Error('expected a meet game')
+  return game
+}
 
 let server: Server
 
@@ -65,9 +70,9 @@ class Client {
   }
 }
 
-const join = async (room: string, token?: string) => {
+const join = async (room: string, token?: string, request?: GameRequest) => {
   const client = await Client.connect(server.port)
-  client.send({ type: 'join', room, token })
+  client.send({ type: 'join', room, token, request })
   const welcome = await client.next('welcome')
   return { client, welcome }
 }
@@ -79,7 +84,7 @@ describe('two devices in a room', () => {
 
     expect(one.welcome.player).toBe(0)
     expect(two.welcome.player).toBe(1)
-    expect(two.welcome.game.starts).toEqual(one.welcome.game.starts)
+    expect(two.welcome.game.setup).toEqual(one.welcome.game.setup)
     expect(two.welcome.partnerHere).toBe(true)
 
     await one.client.close()
@@ -102,7 +107,7 @@ describe('two devices in a room', () => {
   it('shows one player what the other named, without a turn between them', async () => {
     const one = await join('AAAC')
     const two = await join('AAAC')
-    const middle = optimalRoute(replay(one.welcome.game.starts, [])).slice(1, -1)
+    const middle = optimalRoute(meet(replay(one.welcome.game.setup, []))).slice(1, -1)
 
     // Both guess back to back — the same player twice is fine.
     one.client.send({ type: 'guess', code: middle[0]! })
@@ -138,9 +143,9 @@ describe('two devices in a room', () => {
   it('plays a whole game through to a win', async () => {
     const one = await join('AAAE')
     const two = await join('AAAE')
-    const starts = one.welcome.game.starts
+    const setup = one.welcome.game.setup
 
-    for (const code of optimalRoute(replay(starts, [])).slice(1, -1)) {
+    for (const code of optimalRoute(meet(replay(setup, []))).slice(1, -1)) {
       one.client.send({ type: 'guess', code })
       await two.client.next('state')
     }
@@ -157,7 +162,7 @@ describe('coming back', () => {
   it('restores the same seat and the moves already made', async () => {
     const one = await join('AABA')
     const two = await join('AABA')
-    const middle = optimalRoute(replay(one.welcome.game.starts, [])).slice(1, -1)
+    const middle = optimalRoute(meet(replay(one.welcome.game.setup, []))).slice(1, -1)
 
     two.client.send({ type: 'guess', code: middle[0]! })
     await one.client.next('state')
@@ -166,7 +171,7 @@ describe('coming back', () => {
     const back = await join('AABA', two.welcome.token)
 
     expect(back.welcome.player).toBe(1)
-    expect(back.welcome.game.starts).toEqual(two.welcome.game.starts)
+    expect(back.welcome.game.setup).toEqual(two.welcome.game.setup)
     expect(back.welcome.game.moves).toEqual([{ code: middle[0], player: 1 }])
 
     await one.client.close()
@@ -205,15 +210,71 @@ describe('restarting', () => {
   it('deals a new game to both devices', async () => {
     const one = await join('AABC')
     const two = await join('AABC')
-    const before = one.welcome.game.starts
-
+    
     one.client.send({ type: 'restart' })
     const dealt = await two.client.next('state')
     expect(dealt.game.moves).toEqual([])
     // A fresh deal, though it could in principle repeat the same pair.
-    expect(dealt.game.starts).toHaveLength(2)
-    expect(replay(dealt.game.starts, []).status).toBe('playing')
-    expect(before).toHaveLength(2)
+    expect(replay(dealt.game.setup, []).status).toBe('playing')
+    expect(dealt.game.setup.mode).toBe('meet')
+
+    await one.client.close()
+    await two.client.close()
+  })
+})
+
+describe('choosing a mode', () => {
+  it('deals what the first player asked for', async () => {
+    const one = await join('MDAA', undefined, { mode: 'continent', continent: 'africa' })
+    expect(one.welcome.game.setup).toEqual({ mode: 'continent', continent: 'africa' })
+    await one.client.close()
+  })
+
+  it('gives the second player the game already running, not their own', async () => {
+    const one = await join('MDAB', undefined, { mode: 'continent', continent: 'oceania' })
+    // The joiner asks for something else entirely and should be ignored.
+    const two = await join('MDAB', undefined, { mode: 'meet' })
+    expect(two.welcome.game.setup).toEqual(one.welcome.game.setup)
+    await one.client.close()
+    await two.client.close()
+  })
+
+  it('carries an identify round so both phones ask the same question', async () => {
+    const one = await join('MDAC', undefined, { mode: 'identify', scope: 'europe' })
+    const two = await join('MDAC')
+    const setup = one.welcome.game.setup
+    expect(setup.mode).toBe('identify')
+    expect(two.welcome.game.setup).toEqual(setup)
+    if (setup.mode === 'identify') expect(setup.order.length).toBeGreaterThan(0)
+    await one.client.close()
+    await two.client.close()
+  })
+
+  it('lets either player switch the room to another mode', async () => {
+    const one = await join('MDAD', undefined, { mode: 'meet' })
+    const two = await join('MDAD')
+
+    two.client.send({ type: 'restart', request: { mode: 'continent', continent: 'south-america' } })
+    const dealt = await one.client.next('state')
+    expect(dealt.game.setup).toEqual({ mode: 'continent', continent: 'south-america' })
+
+    await one.client.close()
+    await two.client.close()
+  })
+
+  it('reveals a continent game to both players at once', async () => {
+    const one = await join('MDAE', undefined, { mode: 'continent', continent: 'south-america' })
+    const two = await join('MDAE')
+
+    one.client.send({ type: 'guess', code: 'PER' })
+    // Both players get that state; drain it from one's queue so the next
+    // 'state' we read is unambiguously the reveal.
+    await two.client.next('state')
+    await one.client.next('state')
+
+    two.client.send({ type: 'reveal' })
+    const ended = await one.client.next('state')
+    expect(fromSnapshot(ended.game).status).toBe('revealed')
 
     await one.client.close()
     await two.client.close()

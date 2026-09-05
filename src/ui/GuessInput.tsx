@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { search } from '../game/graph.ts'
 import { useLanguage } from './language.tsx'
-import { checkGuess } from '../game/rules.ts'
+import { checkGuess, namableCodes } from '../game/rules.ts'
 import { describeRejection } from './messages.ts'
 import type { GameState, Rejection } from '../game/rules.ts'
 import type { Country, CountryCode } from '../game/types.ts'
@@ -19,7 +19,10 @@ export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
   const [error, setError] = useState<Rejection | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const suggestions: Country[] = text.trim() ? search(text, language) : []
+  // Only ever offer what this game would accept: in a continent game that
+  // means islands are in and other continents are out.
+  const allowed = useMemo(() => namableCodes(game), [game])
+  const suggestions: Country[] = text.trim() ? search(text, language, allowed) : []
 
   const submit = (guess: string) => {
     const check = checkGuess(game, guess)

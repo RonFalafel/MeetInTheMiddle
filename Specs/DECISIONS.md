@@ -94,3 +94,41 @@ six plural forms. A label sidesteps every one of those rules.
 **Refusals are structured, not prose.** `checkMove` returns a reason and a
 country code; the screen turns that into a sentence. Otherwise the server would
 be shipping English to a Hebrew phone.
+
+## 2026-09-05 — two more modes, and hiding the map
+
+**The map can be blanked, per device.** Travle draws nothing but what you got
+right, and it turns out that is a different game rather than a harder skin on
+the same one: with outlines on you are reading a map, with them off you are
+recalling one. It is a view preference, so it lives in `localStorage`, is never
+sent to the other player, and is never part of the game state.
+
+Outlines stay **on** by default. Off is the better mode once you know the
+world, but it is a steep first impression, and the toggle is right there.
+
+**Continent games ignore land connectivity entirely.** Meet in the Middle drops
+39 island nations because there is no land route to them; a continent game has
+no route to build, so those islands come back. That is what makes Oceania
+playable at all, and it means the two modes deliberately disagree about which
+countries exist — the check is per mode, not global.
+
+**Continents are hand-written, not imported.** Russia, Turkey, Cyprus, Egypt
+and the Caucasus all sit on a line somebody drew, and a table in the repo with
+the reasoning next to each awkward case is more honest than inheriting a
+package's answer. The generator refuses to build unless every country is placed
+exactly once.
+
+**A wrong answer in Name that country is accepted, not refused.** Every other
+mode hands a bad guess back for free, on the grounds that a refusal is not a
+move. That rule breaks here: without a cost you would just name every country
+in Europe until one stuck. So identify is the one mode where being wrong is
+recorded, and the prompt does not move until you get it or skip.
+
+**`Setup` and `GameRequest` are different types.** The lobby asks for "a meet
+game" without knowing the start pair; the wire has to carry the exact pair or a
+reconnecting phone would rejoin a different game. Conflating them let the lobby
+send an incomplete setup, so they were split: request in, setup out.
+
+**Identify carries its shuffled order in the setup.** Deriving it from a seed
+would work, but the order is only ten codes and putting it in the setup means
+replay is exact and both phones ask the same question with no shared RNG.

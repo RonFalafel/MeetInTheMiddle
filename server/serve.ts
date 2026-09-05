@@ -68,7 +68,7 @@ export function start(port: number, heartbeatMs = HEARTBEAT_MS): Promise<Server>
         return
       }
 
-      const result = rooms.join(code, message.token, socket)
+      const result = rooms.join(code, message.token, socket, message.request)
       if (!result.ok) {
         send(socket, { type: 'error', error: result.error })
         return
@@ -112,7 +112,13 @@ export function start(port: number, heartbeatMs = HEARTBEAT_MS): Promise<Server>
     }
 
     if (message.type === 'restart') {
-      rooms.restart(attachment.room)
+      rooms.restart(attachment.room, message.request)
+      broadcast(attachment.room, { type: 'state', game: snapshot(attachment.room.game) })
+      return
+    }
+
+    if (message.type === 'reveal') {
+      rooms.reveal(attachment.room)
       broadcast(attachment.room, { type: 'state', game: snapshot(attachment.room.game) })
     }
   }

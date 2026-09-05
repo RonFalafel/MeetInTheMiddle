@@ -25,6 +25,7 @@ import {
 import { LANGUAGE_CODES } from '../src/game/languages.ts'
 import type { LanguageCode } from '../src/game/languages.ts'
 import { SETTINGS } from '../src/settings.ts'
+import { CONTINENTS, CONTINENT_IDS, continentOf } from '../src/game/continents.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
@@ -189,6 +190,7 @@ const countries = [...primaryGeometry.entries()]
       centroid: [round(longitude), round(latitude)] as const,
       neighbours: [...edges.get(code)!].sort(),
       component: componentOf.get(code) ?? null,
+      continent: continentOf(code)!,
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
@@ -224,6 +226,21 @@ function mainlandCentroid(index: number): [number, number] {
 // ----------------------------------------------------------------- invariants
 
 const byCode = new Map(countries.map((c) => [c.code, c]))
+
+// Every country needs a continent, and no country may be in two, or a
+// continent game would be impossible to finish or would double-count.
+const assigned = CONTINENT_IDS.flatMap((id) => CONTINENTS[id])
+const placed = new Set<CountryCode>()
+for (const code of assigned) {
+  if (placed.has(code)) fail(`${code} is listed in two continents in continents.ts.`)
+  if (!byCode.has(code)) fail(`continents.ts lists ${code}, which is not a country here.`)
+  placed.add(code)
+}
+for (const country of countries) {
+  if (!placed.has(country.code)) {
+    fail(`${country.code} (${country.name}) has no continent. Add it to continents.ts.`)
+  }
+}
 
 for (const country of countries) {
   if (country.neighbours.includes(country.code)) fail(`${country.code} borders itself.`)
@@ -327,6 +344,7 @@ const body = countries
     (c) =>
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
       ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
+      ` continent: '${c.continent}',` +
       ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')
@@ -415,4 +433,14 @@ console.log(
     .sort()
     .join(', '),
 )
+console.log('\n  continents (the whole set is playable in a continent game):')
+for (const id of CONTINENT_IDS) {
+  const members = CONTINENTS[id]
+  const byLand = members.filter((code) => byCode.get(code)!.component !== null).length
+  console.log(
+    `    ${id.padEnd(15)} ${String(members.length).padStart(3)} countries,` +
+      ` ${byLand} of them reachable by land`,
+  )
+}
+
 console.log('\n  wrote src/game/data/countries.generated.ts\n')

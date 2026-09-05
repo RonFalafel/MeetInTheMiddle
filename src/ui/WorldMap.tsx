@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { geoNaturalEarth1, geoPath } from 'd3-geo'
 import { feature } from 'topojson-client'
 import type { Feature, Geometry } from 'geojson'
@@ -8,6 +8,8 @@ import { getCountry } from '../game/graph.ts'
 import type { CountryCode } from '../game/types.ts'
 import type { PlayerIndex } from '../game/rules.ts'
 import { useZoomPan } from './useZoomPan.ts'
+import { useLanguage } from './language.tsx'
+import { SETTINGS } from '../settings.ts'
 
 const WIDTH = 960
 
@@ -70,26 +72,83 @@ const projectCentroid = (code: CountryCode): [number, number] | null => {
   return point ? [point[0], point[1]] : null
 }
 
+const OUTLINE_KEY = 'mitm:outlines'
+
+/**
+ * Whether the unnamed world is drawn at all.
+ *
+ * With outlines off you get Travle's version: an empty ocean that fills in only
+ * where you have been right, so you are recalling the shape of the world rather
+ * than reading it off the screen. Purely a view preference — it is per device,
+ * never shared, and never part of the game state.
+ */
+function useOutlines(): [boolean, () => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      const saved = localStorage.getItem(OUTLINE_KEY)
+      return saved === null ? SETTINGS.showOutlines : saved === 'true'
+    } catch {
+      return SETTINGS.showOutlines
+    }
+  })
+
+  const toggle = useCallback(() => {
+    setOn((current) => {
+      try {
+        localStorage.setItem(OUTLINE_KEY, String(!current))
+      } catch {
+        // A private window refusing storage is not worth a broken toggle.
+      }
+      return !current
+    })
+  }, [])
+
+  return [on, toggle]
+}
+
 export type WorldMapProps = {
   readonly claimed: ReadonlyMap<CountryCode, PlayerIndex>
-  readonly starts: readonly [CountryCode, CountryCode]
+  /** Ringed on the map. Empty in a continent game, which has no starts. */
+  readonly starts?: readonly CountryCode[]
   /** Drawn as a line once the two sides join up. */
   readonly route?: readonly CountryCode[] | null
   /** Hides one player's countries when partner visibility is off. */
   readonly hiddenPlayer?: PlayerIndex | null
-  /** The map opens looking here — on a phone the world does not fit at once. */
-  readonly focus?: CountryCode
+  /** The map opens framed on these — on a phone the world does not fit at once. */
+  readonly focus?: readonly CountryCode[]
+  /** Drawn faintly once a game is over, to show what was missed. */
+  readonly missed?: readonly CountryCode[]
+  /** The country being asked about, drawn lit up and deliberately unnamed. */
+  readonly highlight?: CountryCode | null
 }
 
-export function WorldMap({ claimed, starts, route, hiddenPlayer, focus }: WorldMapProps) {
+export function WorldMap({
+  claimed,
+  starts = [],
+  route,
+  hiddenPlayer,
+  focus,
+  missed,
+  highlight,
+}: WorldMapProps) {
+  const { t } = useLanguage()
   const { transform, surfaceProps, reset, centreOn, moved } = useZoomPan(WIDTH, HEIGHT)
+  const [outlines, toggleOutlines] = useOutlines()
 
-  // On a narrow screen the map is cropped, so open it over the player's own
-  // start rather than wherever the middle of the world happens to be.
+  // On a narrow screen the map is cropped, so open it over what the player
+  // actually cares about rather than the middle of the world.
+  const focusKey = focus?.join(',')
   useEffect(() => {
-    const point = focus ? projectCentroid(focus) : null
-    if (point) centreOn({ x: point[0], y: point[1] })
-  }, [focus, centreOn])
+    const points = (focus ?? []).map(projectCentroid).filter((p): p is [number, number] => p !== null)
+    if (points.length === 0) return
+    centreOn({
+      x: points.reduce((total, p) => total + p[0], 0) / points.length,
+      y: points.reduce((total, p) => total + p[1], 0) / points.length,
+    })
+    // focusKey rather than focus: a fresh array each render would re-centre
+    // the map out from under a player who had panned away.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, centreOn])
 
   const visible = useMemo(() => {
     if (hiddenPlayer == null) return claimed
@@ -97,6 +156,8 @@ export function WorldMap({ claimed, starts, route, hiddenPlayer, focus }: WorldM
     for (const [code, player] of claimed) if (player !== hiddenPlayer) shown.set(code, player)
     return shown
   }, [claimed, hiddenPlayer])
+
+  const missedSet = useMemo(() => new Set(missed ?? []), [missed])
 
   const routeLine = useMemo(() => {
     if (!route || route.length < 2) return null
@@ -122,16 +183,31 @@ export function WorldMap({ claimed, starts, route, hiddenPlayer, focus }: WorldM
 
           {SHAPES.map((shape, index) => {
             const player = shape.code ? visible.get(shape.code) : undefined
+            const isMissed = shape.code !== null && missedSet.has(shape.code)
+
+            // With outlines off, anything not on the board is simply not drawn —
+            // except the country being asked about, which is the whole question.
+            const lit = shape.code !== null && shape.code === highlight
+            if (player === undefined && !isMissed && !lit && !outlines) return null
+
             const className =
-              shape.code === null || getCountry(shape.code).component === null
-                ? 'land out-of-play'
-                : player === undefined
-                  ? 'land'
-                  : `land player-${player}${starts.includes(shape.code) ? ' start' : ''}`
+              shape.code !== null && shape.code === highlight
+                ? 'land highlight'
+                : player !== undefined
+                  ? `land player-${player}${starts.includes(shape.code!) ? ' start' : ''}`
+                  : isMissed
+                    ? 'land missed'
+                    : shape.code === null || getCountry(shape.code).component === null
+                      ? 'land out-of-play'
+                      : 'land'
             return <path key={index} className={className} d={shape.d} strokeWidth={crisp(0.4)} />
           })}
 
           {routeLine && <path className="route" d={routeLine} strokeWidth={crisp(2)} />}
+
+          {highlight && SHAPE_BY_CODE.get(highlight)?.tiny && (
+            <Dot code={highlight} className="tiny highlight" r={crisp(4)} />
+          )}
 
           {/* Microstates are smaller than a pixel at this scale, so they get a dot. */}
           {[...visible].map(([code, player]) =>
@@ -143,7 +219,7 @@ export function WorldMap({ claimed, starts, route, hiddenPlayer, focus }: WorldM
           {/* A ring in the sea colour, so a start reads even on top of its own fill. */}
           {starts.map((code, player) =>
             visible.has(code) ? (
-              <g key={`start-${player}`} className={`start-marker player-${player}`}>
+              <g key={`start-${code}`} className={`start-marker player-${player}`}>
                 <Dot code={code} className="halo" r={crisp(8)} strokeWidth={crisp(4.5)} />
                 <Dot code={code} className="ring" r={crisp(8)} strokeWidth={crisp(2)} />
               </g>
@@ -152,11 +228,16 @@ export function WorldMap({ claimed, starts, route, hiddenPlayer, focus }: WorldM
         </g>
       </svg>
 
-      {moved && (
-        <button type="button" className="reset-zoom" onClick={reset}>
-          Whole world
+      <div className="map-buttons">
+        {moved && (
+          <button type="button" onClick={reset}>
+            {t.wholeWorld}
+          </button>
+        )}
+        <button type="button" onClick={toggleOutlines} aria-pressed={outlines}>
+          {outlines ? t.hideOutlines : t.showOutlines}
         </button>
-      )}
+      </div>
     </div>
   )
 }

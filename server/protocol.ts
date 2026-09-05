@@ -8,7 +8,7 @@
  * dropped message self-healing.
  */
 
-import type { Move, PlayerIndex, Rejection } from '../src/game/rules.ts'
+import type { GameRequest, PlayerIndex, Rejection, Snapshot } from '../src/game/rules.ts'
 import type { CountryCode } from '../src/game/types.ts'
 
 export type RoomCode = string
@@ -17,15 +17,20 @@ export type RoomCode = string
 export type ErrorCode = 'bad-room' | 'room-full' | 'taken-over' | 'not-joined' | 'bad-message'
 
 export type ClientMessage =
-  /** `token` resumes a seat this device already held, after a reconnect. */
-  | { type: 'join'; room: RoomCode; token?: string }
+  /**
+   * `token` resumes a seat this device already held, after a reconnect.
+   * `request` only applies when the room does not exist yet — whoever gets there
+   * first picks the game, and the second player joins whatever is already running.
+   */
+  | { type: 'join'; room: RoomCode; token?: string; request?: GameRequest }
   | { type: 'guess'; code: CountryCode }
-  | { type: 'restart' }
+  /** Omitting `request` deals another game of the same kind. */
+  | { type: 'restart'; request?: GameRequest }
+  /** Continent games only: end it early and show what was missed. */
+  | { type: 'reveal' }
 
-export type GameSnapshot = {
-  starts: readonly [CountryCode, CountryCode]
-  moves: readonly Move[]
-}
+/** The whole game, as `rules.ts` serialises it. */
+export type GameSnapshot = Snapshot
 
 export type ServerMessage =
   | {

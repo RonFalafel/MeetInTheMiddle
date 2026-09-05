@@ -170,9 +170,10 @@ describe('guessing across languages', () => {
     expect(search('Germany', 'he').map((c) => c.code)).toContain('DEU')
   })
 
-  it('never suggests a country that is out of play, in any language', () => {
+  it('honours a restriction in every language', () => {
+    const reachable = new Set(PLAYABLE_CODES)
     for (const language of LANGUAGE_CODES) {
-      for (const country of search('a', language, 20)) {
+      for (const country of search('a', language, reachable, 20)) {
         expect(country.component, `${country.code} in ${language}`).not.toBeNull()
       }
     }

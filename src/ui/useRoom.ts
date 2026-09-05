@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { replay } from '../game/rules.ts'
-import type { GameState, PlayerIndex } from '../game/rules.ts'
+import { fromSnapshot } from '../game/rules.ts'
+import type { GameRequest, GameState, PlayerIndex } from '../game/rules.ts'
 import type { CountryCode } from '../game/types.ts'
 import type { ClientMessage, ServerMessage } from '../../server/protocol.ts'
 import type { Notice, Session } from './session.ts'
@@ -18,7 +18,7 @@ const tokenKey = (room: string) => `mitm:seat:${room}`
  * sends guesses and redraws whatever comes back, which is what keeps two
  * phones from disagreeing.
  */
-export function useRoom(room: string | null): Session {
+export function useRoom(room: string | null, request?: GameRequest): Session {
   const [game, setGame] = useState<GameState | null>(null)
   const [me, setMe] = useState<PlayerIndex>(0)
   const [connection, setConnection] = useState<Session['connection']>('connecting')
@@ -29,6 +29,13 @@ export function useRoom(room: string | null): Session {
   const retry = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Set when the server refuses us outright, so we stop trying to get back in.
   const rejected = useRef(false)
+
+  // Held in a ref so choosing a mode does not re-run the connect effect; it
+  // is only ever read at the moment we join.
+  const wanted = useRef(request)
+  useEffect(() => {
+    wanted.current = request
+  }, [request])
 
   const post = useCallback((message: ClientMessage) => {
     const live = socket.current
@@ -49,7 +56,14 @@ export function useRoom(room: string | null): Session {
 
       live.addEventListener('open', () => {
         const token = localStorage.getItem(tokenKey(room)) ?? undefined
-        live.send(JSON.stringify({ type: 'join', room, token } satisfies ClientMessage))
+        live.send(
+          JSON.stringify({
+            type: 'join',
+            room,
+            token,
+            request: wanted.current,
+          } satisfies ClientMessage),
+        )
       })
 
       live.addEventListener('message', (event) => {
@@ -65,12 +79,13 @@ export function useRoom(room: string | null): Session {
             localStorage.setItem(tokenKey(room), message.token)
             setMe(message.player)
             setPartnerHere(message.partnerHere)
-            setGame(replay(message.game.starts, message.game.moves))
+            setGame(fromSnapshot(message.game))
             setConnection('live')
             setNotice(null)
             break
           case 'state':
-            setGame(replay(message.game.starts, message.game.moves))
+            setGame(fromSnapshot(message.game))
+            setNotice(null)
             break
           case 'partner':
             setPartnerHere(message.here)
@@ -114,7 +129,12 @@ export function useRoom(room: string | null): Session {
     [post],
   )
 
-  const restart = useCallback(() => post({ type: 'restart' }), [post])
+  const restart = useCallback(
+    (next?: GameRequest) => post({ type: 'restart', request: next }),
+    [post],
+  )
+
+  const revealRest = useCallback(() => post({ type: 'reveal' }), [post])
 
   return {
     game,
@@ -122,6 +142,7 @@ export function useRoom(room: string | null): Session {
     setMe: null,
     guess,
     restart,
+    reveal: revealRest,
     connection,
     roomCode: room,
     partnerHere,

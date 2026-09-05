@@ -1,3 +1,5 @@
+import type { ContinentId } from './continents.ts'
+
 /** ISO 3166-1 alpha-3, or an X-prefixed user-assigned code for entities without one. */
 export type CountryCode = string
 
@@ -18,4 +20,10 @@ export type Country = {
    * can never join a route.
    */
   readonly component: number | null
+  /**
+   * Every country has one, including the islands that are out of play for
+   * Meet in the Middle. Continent games do not care about land routes, so
+   * Australia and Iceland are perfectly playable there.
+   */
+  readonly continent: ContinentId
 }

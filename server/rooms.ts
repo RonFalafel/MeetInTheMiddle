@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { SETTINGS } from '../src/settings.ts'
-import { applyMove, checkMove, newGame } from '../src/game/rules.ts'
-import type { GameState, PlayerIndex, Rejection } from '../src/game/rules.ts'
+import { applyMove, checkMove, deal, repeatOf, reveal, snapshot } from '../src/game/rules.ts'
+import type { GameRequest, GameState, PlayerIndex, Rejection } from '../src/game/rules.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import { makeRoomCode } from './protocol.ts'
-import type { GameSnapshot, RoomCode } from './protocol.ts'
+import type { RoomCode } from './protocol.ts'
 
 /** Rooms are memory only. A restart drops every game, which is the right trade for a party game. */
 const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
@@ -44,11 +44,11 @@ export type JoinResult<Connection> =
     }
   | { ok: false; error: 'room-full' }
 
-const startGame = () => newGame({ minHops: SETTINGS.minHops, maxHops: SETTINGS.maxHops })
+const startGame = (request?: GameRequest): GameState =>
+  deal(request, { minHops: SETTINGS.minHops, maxHops: SETTINGS.maxHops })
 
-export function snapshot(game: GameState): GameSnapshot {
-  return { starts: game.starts, moves: game.moves }
-}
+/** Re-exported so the server has one obvious place to reach for it. */
+export { snapshot }
 
 export type RoomsOptions = {
   /** Overridable so tests do not have to wait a minute. */
@@ -67,13 +67,10 @@ export class Rooms<Connection> {
   }
 
   /** A code that is not already taken. */
-  create(): Room<Connection> {
+  create(request?: GameRequest): Room<Connection> {
     let code = makeRoomCode()
     while (this.rooms.has(code)) code = makeRoomCode()
-
-    const room: Room<Connection> = { code, game: startGame(), seats: [null, null], touchedAt: Date.now() }
-    this.rooms.set(code, room)
-    return room
+    return this.createWithCode(code, request)
   }
 
   get(code: RoomCode): Room<Connection> | undefined {
@@ -85,8 +82,15 @@ export class Rooms<Connection> {
    * long it was away — that is what makes a dropped phone able to rejoin
    * mid-game rather than being told the room is full.
    */
-  join(code: RoomCode, token: string | undefined, connection: Connection): JoinResult<Connection> {
-    const room = this.rooms.get(code) ?? this.createWithCode(code)
+  join(
+    code: RoomCode,
+    token: string | undefined,
+    connection: Connection,
+    request?: GameRequest,
+  ): JoinResult<Connection> {
+    // The request only counts for whoever creates the room; the second player
+    // joins the game already in progress rather than replacing it.
+    const room = this.rooms.get(code) ?? this.createWithCode(code, request)
     room.touchedAt = Date.now()
 
     if (token) {
@@ -136,13 +140,25 @@ export class Rooms<Connection> {
     return { ok: true }
   }
 
-  restart(room: Room<Connection>): void {
-    room.game = startGame()
+  /** Omitting the setup deals another game of the same kind. */
+  restart(room: Room<Connection>, request?: GameRequest): void {
+    room.game = startGame(request ?? repeatOf(room.game))
     room.touchedAt = Date.now()
   }
 
-  private createWithCode(code: RoomCode): Room<Connection> {
-    const room: Room<Connection> = { code, game: startGame(), seats: [null, null], touchedAt: Date.now() }
+  /** Continent and identify games. Ends it and shows what was missed. */
+  reveal(room: Room<Connection>): void {
+    if (room.game.mode !== 'meet') room.game = reveal(room.game)
+    room.touchedAt = Date.now()
+  }
+
+  private createWithCode(code: RoomCode, request?: GameRequest): Room<Connection> {
+    const room: Room<Connection> = {
+      code,
+      game: startGame(request),
+      seats: [null, null],
+      touchedAt: Date.now(),
+    }
     this.rooms.set(code, room)
     return room
   }

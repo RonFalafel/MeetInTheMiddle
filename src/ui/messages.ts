@@ -27,6 +27,8 @@ export function describeRejection(
       return format(t.rejectWrongLandmass, { country })
     case 'already-named':
       return format(t.rejectAlreadyNamed, { country })
+    case 'wrong-continent':
+      return format(t.rejectWrongContinent, { country })
     case 'game-over':
       return t.rejectGameOver
   }

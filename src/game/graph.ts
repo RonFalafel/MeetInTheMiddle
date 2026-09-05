@@ -140,7 +140,13 @@ export function resolveCountry(text: string): Country | undefined {
  * Only countries in play are offered — suggesting Australia when Australia can
  * never be part of a route is just a trap.
  */
-export function search(text: string, language: LanguageCode, limit = 8): Country[] {
+export function search(
+  text: string,
+  language: LanguageCode,
+  /** Codes this game would accept. Omit to search every country. */
+  within?: ReadonlySet<CountryCode>,
+  limit = 8,
+): Country[] {
   const needle = normalise(text)
   if (!needle) return []
 
@@ -149,7 +155,7 @@ export function search(text: string, language: LanguageCode, limit = 8): Country
   const otherLanguage: Country[] = []
 
   for (const country of COUNTRIES) {
-    if (country.component === null) continue
+    if (within && !within.has(country.code)) continue
 
     const own = namesFor(country, language).map(normalise)
     if (own.some((name) => name.startsWith(needle))) starts.push(country)

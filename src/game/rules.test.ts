@@ -13,6 +13,7 @@ import {
   optimalRoute,
   par,
   replay,
+  setupOf,
   startPair,
 } from './rules.ts'
 import type { GameState, PlayerIndex } from './rules.ts'
@@ -29,7 +30,7 @@ function seeded(seed: number): () => number {
 }
 
 /** Plays a list of countries, alternating players unless told otherwise. */
-const play = (game: GameState, codes: string[], player?: PlayerIndex): GameState =>
+const play = <S extends GameState>(game: S, codes: string[], player?: PlayerIndex): S =>
   codes.reduce(
     (state, code, index) => applyMove(state, code, player ?? ((index % 2) as PlayerIndex)),
     game,
@@ -242,14 +243,14 @@ describe('meeting', () => {
 describe('replaying a move list', () => {
   it('rebuilds the same game, which is how a device catches up', () => {
     const original = play(gameFrom('PRT', 'POL'), ['ESP', 'FRA', 'DEU'])
-    const rebuilt = replay(original.starts, original.moves)
+    const rebuilt = replay(setupOf(original), original.moves)
     expect(rebuilt).toEqual(original)
     expect(rebuilt.status).toBe('won')
   })
 
   it('survives a round trip through JSON', () => {
     const original = play(gameFrom('PRT', 'POL'), ['ESP', 'UKR'])
-    const wire = JSON.parse(JSON.stringify({ starts: original.starts, moves: original.moves }))
-    expect(replay(wire.starts, wire.moves)).toEqual(original)
+    const wire = JSON.parse(JSON.stringify({ setup: setupOf(original), moves: original.moves }))
+    expect(replay(wire.setup, wire.moves)).toEqual(original)
   })
 })

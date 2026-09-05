@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { Rooms } from './rooms.ts'
 import { makeRoomCode, normaliseRoomCode } from './protocol.ts'
 import { optimalRoute } from '../src/game/rules.ts'
+import type { MeetGame, GameState } from '../src/game/rules.ts'
+
+/** Rooms deal Meet in the Middle unless asked otherwise; this narrows to it. */
+const meet = (game: GameState): MeetGame => {
+  if (game.mode !== 'meet') throw new Error('expected a meet game')
+  return game
+}
 
 /** Stand-in for a socket — rooms only ever compare these by identity. */
 const socket = (name: string) => ({ name })
@@ -149,7 +156,7 @@ describe('coming back after a dropped connection', () => {
     seatIn(rooms, 'ABCD', socket('a'))
     seatIn(rooms, 'ABCD', socket('b'))
     const room = rooms.get('ABCD')!
-    const middle = optimalRoute(room.game).slice(1, -1)
+    const middle = optimalRoute(meet(room.game)).slice(1, -1)
 
     rooms.leave(room, room.seats[1]!.connection!)
     expect(rooms.guess(room, 0, middle[0]!)).toEqual({ ok: true })
@@ -163,7 +170,7 @@ describe('guessing through a room', () => {
     const rooms = new Rooms<object>()
     seatIn(rooms, 'ABCD', socket('a'))
     const room = rooms.get('ABCD')!
-    const middle = optimalRoute(room.game).slice(1, -1)
+    const middle = optimalRoute(meet(room.game)).slice(1, -1)
 
     expect(rooms.guess(room, 1, middle[0]!)).toEqual({ ok: true })
     expect(room.game.moves[0]).toEqual({ code: middle[0], player: 1 })
@@ -185,7 +192,7 @@ describe('guessing through a room', () => {
     const rooms = new Rooms<object>()
     seatIn(rooms, 'ABCD', socket('a'))
     const room = rooms.get('ABCD')!
-    const middle = optimalRoute(room.game).slice(1, -1)
+    const middle = optimalRoute(meet(room.game)).slice(1, -1)
 
     expect(rooms.guess(room, 0, middle[0]!)).toEqual({ ok: true })
     expect(rooms.guess(room, 1, middle[0]!)).toMatchObject({ ok: false })
@@ -197,7 +204,7 @@ describe('guessing through a room', () => {
     const rooms = new Rooms<object>()
     seatIn(rooms, 'ABCD', socket('a'))
     const room = rooms.get('ABCD')!
-    for (const code of optimalRoute(room.game).slice(1, -1)) {
+    for (const code of optimalRoute(meet(room.game)).slice(1, -1)) {
       expect(rooms.guess(room, 0, code)).toEqual({ ok: true })
     }
     expect(room.game.status).toBe('won')
@@ -208,7 +215,7 @@ describe('guessing through a room', () => {
     const rooms = new Rooms<object>()
     const first = seatIn(rooms, 'ABCD', socket('a'))
     const room = rooms.get('ABCD')!
-    rooms.guess(room, 0, optimalRoute(room.game)[1]!)
+    rooms.guess(room, 0, optimalRoute(meet(room.game))[1]!)
 
     rooms.restart(room)
     expect(room.game.moves).toHaveLength(0)

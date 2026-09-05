@@ -256,10 +256,11 @@ describe('name matching', () => {
     expect(normalise('São Tomé & Príncipe')).toBe('saotomeprincipe')
   })
 
-  it('only ever suggests countries you are allowed to name', () => {
+  it('finds any country, and narrows to a set when given one', () => {
     expect(search('ger', 'en')[0]?.code).toBe('DEU')
     expect(search('', 'en')).toEqual([])
-    expect(search('austral', 'en')).toEqual([])
-    for (const country of search('a', 'en', 8)) expect(country.component).not.toBeNull()
+    // Whether Australia may be named is the game's business, not the search's.
+    expect(search('austral', 'en')[0]?.code).toBe('AUS')
+    expect(search('austral', 'en', new Set(PLAYABLE_CODES))).toEqual([])
   })
 })

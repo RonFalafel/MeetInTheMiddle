@@ -1,4 +1,4 @@
-import type { GameState, PlayerIndex, Rejection } from '../game/rules.ts'
+import type { GameRequest, GameState, PlayerIndex, Rejection } from '../game/rules.ts'
 import type { ErrorCode } from '../../server/protocol.ts'
 import type { CountryCode } from '../game/types.ts'
 
@@ -13,7 +13,10 @@ export type Session = {
   /** Only offered on one device — in a room the server decides your seat. */
   readonly setMe: ((player: PlayerIndex) => void) | null
   readonly guess: (code: CountryCode) => void
-  readonly restart: (() => void) | null
+  /** Omitting the request deals another game of the same kind. */
+  readonly restart: ((request?: GameRequest) => void) | null
+  /** Continent games only: end it early and show what was missed. */
+  readonly reveal: (() => void) | null
   readonly connection: 'local' | 'connecting' | 'live' | 'dropped'
   readonly roomCode: string | null
   readonly partnerHere: boolean

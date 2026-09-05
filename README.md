@@ -35,6 +35,22 @@ npm run sync
 | `npm run graph` | regenerate the country graph |
 | `npm run play` | play a game in the terminal |
 
+## The three modes
+
+- **Meet in the middle** — two secret starts, name countries until they join up.
+- **Fill a continent** — no starts; name every country in one continent between
+  you. Islands are in play here, so Oceania exists in this mode only.
+- **Name that country** — a country lights up on the map and you name it, ten a
+  round, from one continent or the whole world.
+
+The last two are just as good on your own as with someone else.
+
+There is a **map outline toggle** next to the zoom controls. With outlines off
+you get Travle's version: an empty ocean that fills in only where you were
+right. It is per device, remembered, and never shared with the other player —
+`SETTINGS.showOutlines` sets the starting value. In Name that country with
+outlines off, the lit country is the only thing on the screen.
+
 ## The rules, as built
 
 - **Name any country, any time.** No adjacency requirement and no turn order.

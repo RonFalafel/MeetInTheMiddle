@@ -11,6 +11,8 @@
  * in their own language and still type into the same board.
  */
 
+import type { ContinentId } from './continents.ts'
+
 export type LanguageCode = 'en' | 'he' | 'ar' | 'es' | 'fr' | 'de' | 'it' | 'nl' | 'pt' | 'ru'
 
 export type Language = {
@@ -104,6 +106,27 @@ export type Strings = {
   errRoomFull: string
   errTakenOver: string
   errGeneric: string
+
+  modeMeet: string
+  modeMeetHint: string
+  modeContinent: string
+  modeContinentHint: string
+  chooseContinent: string
+  randomContinent: string
+  named: string
+  missed: string
+  giveUp: string
+  filledIt: string
+  gaveUp: string
+  rejectWrongContinent: string
+  showOutlines: string
+  hideOutlines: string
+  modeIdentify: string
+  modeIdentifyHint: string
+  whichCountry: string
+  skip: string
+  correct: string
+  continents: Readonly<Record<ContinentId, string>>
 }
 
 export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
@@ -155,6 +178,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'That room already has two players.',
     errTakenOver: 'You opened this game somewhere else.',
     errGeneric: 'Something went wrong.',
+    modeMeet: 'Meet in the middle',
+    modeMeetHint: 'Two secret starts. Name countries until your two sides join up.',
+    modeContinent: 'Fill a continent',
+    modeContinentHint: 'No starts. Name every country in one continent, together.',
+    chooseContinent: 'Which continent?',
+    randomContinent: 'Surprise us',
+    named: 'Named',
+    missed: 'Missed',
+    giveUp: 'Show what is left',
+    filledIt: 'You filled it in',
+    gaveUp: 'Here is the rest',
+    rejectWrongContinent: '{country} is not in this continent.',
+    showOutlines: 'Show outlines',
+    hideOutlines: 'Hide outlines',
+    modeIdentify: 'Name that country',
+    modeIdentifyHint: 'One country lights up on the map. Say which it is.',
+    whichCountry: 'Which country is highlighted?',
+    skip: 'Skip',
+    correct: 'Right',
+    continents: {
+      europe: 'Europe',
+      asia: 'Asia',
+      africa: 'Africa',
+      'north-america': 'North America',
+      'south-america': 'South America',
+      oceania: 'Oceania',
+    },
   },
 
   he: {
@@ -205,6 +255,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'בחדר הזה כבר יש שני שחקנים.',
     errTakenOver: 'פתחתם את המשחק במקום אחר.',
     errGeneric: 'משהו השתבש.',
+    modeMeet: 'להיפגש באמצע',
+    modeMeetHint: 'שתי נקודות פתיחה סודיות. תנו שמות של מדינות עד ששני הצדדים מתחברים.',
+    modeContinent: 'למלא יבשת',
+    modeContinentHint: 'בלי נקודת פתיחה. תנו יחד שמות של כל המדינות ביבשת אחת.',
+    chooseContinent: 'איזו יבשת?',
+    randomContinent: 'תפתיעו אותנו',
+    named: 'נאמרו',
+    missed: 'חסרו',
+    giveUp: 'להראות מה נשאר',
+    filledIt: 'מילאתם את הכל',
+    gaveUp: 'הנה השאר',
+    rejectWrongContinent: '{country} לא נמצאת ביבשת הזאת.',
+    showOutlines: 'להראות גבולות',
+    hideOutlines: 'להסתיר גבולות',
+    modeIdentify: 'נחשו את המדינה',
+    modeIdentifyHint: 'מדינה אחת נדלקת על המפה. אמרו איזו.',
+    whichCountry: 'איזו מדינה מסומנת?',
+    skip: 'לדלג',
+    correct: 'נכון',
+    continents: {
+      europe: 'אירופה',
+      asia: 'אסיה',
+      africa: 'אפריקה',
+      'north-america': 'צפון אמריקה',
+      'south-america': 'דרום אמריקה',
+      oceania: 'אוקיאניה',
+    },
   },
 
   ar: {
@@ -255,6 +332,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'في هذه الغرفة لاعبان بالفعل.',
     errTakenOver: 'لقد فتحت اللعبة في مكان آخر.',
     errGeneric: 'حدث خطأ ما.',
+    modeMeet: 'نلتقي في المنتصف',
+    modeMeetHint: 'نقطتا بداية سريتان. اذكرا أسماء دول حتى يتصل الجانبان.',
+    modeContinent: 'املأ قارة',
+    modeContinentHint: 'بلا نقطة بداية. اذكرا معًا كل دول قارة واحدة.',
+    chooseContinent: 'أي قارة؟',
+    randomContinent: 'فاجئنا',
+    named: 'مذكورة',
+    missed: 'فائتة',
+    giveUp: 'أظهر ما تبقى',
+    filledIt: 'أكملتماها',
+    gaveUp: 'وهذا الباقي',
+    rejectWrongContinent: '{country} ليست في هذه القارة.',
+    showOutlines: 'إظهار الحدود',
+    hideOutlines: 'إخفاء الحدود',
+    modeIdentify: 'خمّن الدولة',
+    modeIdentifyHint: 'تضيء دولة واحدة على الخريطة. قل أيها.',
+    whichCountry: 'أي دولة مضاءة؟',
+    skip: 'تخطٍّ',
+    correct: 'صحيح',
+    continents: {
+      europe: 'أوروبا',
+      asia: 'آسيا',
+      africa: 'أفريقيا',
+      'north-america': 'أمريكا الشمالية',
+      'south-america': 'أمريكا الجنوبية',
+      oceania: 'أوقيانوسيا',
+    },
   },
 
   es: {
@@ -305,6 +409,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'Esa sala ya tiene dos jugadores.',
     errTakenOver: 'Has abierto el juego en otro sitio.',
     errGeneric: 'Algo ha salido mal.',
+    modeMeet: 'Encontrarse en el medio',
+    modeMeetHint: 'Dos inicios secretos. Nombrad países hasta que los dos lados se unan.',
+    modeContinent: 'Llenar un continente',
+    modeContinentHint: 'Sin inicios. Nombrad juntos todos los países de un continente.',
+    chooseContinent: '¿Qué continente?',
+    randomContinent: 'Sorpréndenos',
+    named: 'Nombrados',
+    missed: 'Faltaron',
+    giveUp: 'Mostrar lo que queda',
+    filledIt: 'Lo habéis completado',
+    gaveUp: 'Esto es lo que faltaba',
+    rejectWrongContinent: '{country} no está en este continente.',
+    showOutlines: 'Mostrar contornos',
+    hideOutlines: 'Ocultar contornos',
+    modeIdentify: 'Adivina el país',
+    modeIdentifyHint: 'Un país se ilumina en el mapa. Di cuál es.',
+    whichCountry: '¿Qué país está marcado?',
+    skip: 'Saltar',
+    correct: 'Aciertos',
+    continents: {
+      europe: 'Europa',
+      asia: 'Asia',
+      africa: 'África',
+      'north-america': 'América del Norte',
+      'south-america': 'América del Sur',
+      oceania: 'Oceanía',
+    },
   },
 
   fr: {
@@ -355,6 +486,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'Ce salon a déjà deux joueurs.',
     errTakenOver: 'Vous avez ouvert le jeu ailleurs.',
     errGeneric: 'Une erreur est survenue.',
+    modeMeet: 'Se retrouver au milieu',
+    modeMeetHint: 'Deux départs secrets. Nommez des pays jusqu’à ce que vos deux côtés se rejoignent.',
+    modeContinent: 'Remplir un continent',
+    modeContinentHint: 'Aucun départ. Nommez ensemble tous les pays d’un continent.',
+    chooseContinent: 'Quel continent ?',
+    randomContinent: 'Surprenez-nous',
+    named: 'Nommés',
+    missed: 'Manqués',
+    giveUp: 'Montrer ce qui reste',
+    filledIt: 'Vous l’avez rempli',
+    gaveUp: 'Voici le reste',
+    rejectWrongContinent: '{country} n’est pas sur ce continent.',
+    showOutlines: 'Afficher les contours',
+    hideOutlines: 'Masquer les contours',
+    modeIdentify: 'Devinez le pays',
+    modeIdentifyHint: 'Un pays s’allume sur la carte. Dites lequel.',
+    whichCountry: 'Quel pays est en surbrillance ?',
+    skip: 'Passer',
+    correct: 'Justes',
+    continents: {
+      europe: 'Europe',
+      asia: 'Asie',
+      africa: 'Afrique',
+      'north-america': 'Amérique du Nord',
+      'south-america': 'Amérique du Sud',
+      oceania: 'Océanie',
+    },
   },
 
   de: {
@@ -405,6 +563,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'In diesem Raum sind schon zwei Spieler.',
     errTakenOver: 'Du hast das Spiel woanders geöffnet.',
     errGeneric: 'Etwas ist schiefgelaufen.',
+    modeMeet: 'In der Mitte treffen',
+    modeMeetHint: 'Zwei geheime Startländer. Nennt Länder, bis eure Seiten sich verbinden.',
+    modeContinent: 'Einen Kontinent füllen',
+    modeContinentHint: 'Kein Start. Nennt gemeinsam jedes Land eines Kontinents.',
+    chooseContinent: 'Welcher Kontinent?',
+    randomContinent: 'Überrascht uns',
+    named: 'Genannt',
+    missed: 'Gefehlt',
+    giveUp: 'Rest anzeigen',
+    filledIt: 'Ihr habt ihn vollgemacht',
+    gaveUp: 'Hier ist der Rest',
+    rejectWrongContinent: '{country} liegt nicht auf diesem Kontinent.',
+    showOutlines: 'Umrisse zeigen',
+    hideOutlines: 'Umrisse ausblenden',
+    modeIdentify: 'Errate das Land',
+    modeIdentifyHint: 'Ein Land leuchtet auf der Karte auf. Sag welches.',
+    whichCountry: 'Welches Land ist markiert?',
+    skip: 'Überspringen',
+    correct: 'Richtig',
+    continents: {
+      europe: 'Europa',
+      asia: 'Asien',
+      africa: 'Afrika',
+      'north-america': 'Nordamerika',
+      'south-america': 'Südamerika',
+      oceania: 'Ozeanien',
+    },
   },
 
   it: {
@@ -455,6 +640,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'Questa stanza ha già due giocatori.',
     errTakenOver: 'Hai aperto il gioco altrove.',
     errGeneric: 'Qualcosa è andato storto.',
+    modeMeet: 'Incontrarsi a metà strada',
+    modeMeetHint: 'Due partenze segrete. Nominate paesi finché i due lati non si uniscono.',
+    modeContinent: 'Riempire un continente',
+    modeContinentHint: 'Nessuna partenza. Nominate insieme tutti i paesi di un continente.',
+    chooseContinent: 'Quale continente?',
+    randomContinent: 'Sorprendici',
+    named: 'Nominati',
+    missed: 'Mancati',
+    giveUp: 'Mostra quel che resta',
+    filledIt: 'Lo avete completato',
+    gaveUp: 'Ecco il resto',
+    rejectWrongContinent: '{country} non è in questo continente.',
+    showOutlines: 'Mostra i contorni',
+    hideOutlines: 'Nascondi i contorni',
+    modeIdentify: 'Indovina il paese',
+    modeIdentifyHint: 'Un paese si illumina sulla mappa. Di quale si tratta?',
+    whichCountry: 'Quale paese è evidenziato?',
+    skip: 'Salta',
+    correct: 'Giusti',
+    continents: {
+      europe: 'Europa',
+      asia: 'Asia',
+      africa: 'Africa',
+      'north-america': 'America del Nord',
+      'south-america': 'America del Sud',
+      oceania: 'Oceania',
+    },
   },
 
   nl: {
@@ -505,6 +717,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'Die kamer heeft al twee spelers.',
     errTakenOver: 'Je hebt het spel ergens anders geopend.',
     errGeneric: 'Er ging iets mis.',
+    modeMeet: 'Elkaar in het midden treffen',
+    modeMeetHint: 'Twee geheime startlanden. Noem landen tot jullie kanten aan elkaar vast zitten.',
+    modeContinent: 'Een werelddeel vullen',
+    modeContinentHint: 'Geen start. Noem samen elk land van één werelddeel.',
+    chooseContinent: 'Welk werelddeel?',
+    randomContinent: 'Verras ons',
+    named: 'Genoemd',
+    missed: 'Gemist',
+    giveUp: 'Laat de rest zien',
+    filledIt: 'Jullie hebben hem vol',
+    gaveUp: 'Dit is de rest',
+    rejectWrongContinent: '{country} ligt niet in dit werelddeel.',
+    showOutlines: 'Grenzen tonen',
+    hideOutlines: 'Grenzen verbergen',
+    modeIdentify: 'Raad het land',
+    modeIdentifyHint: 'Eén land licht op de kaart op. Zeg welk.',
+    whichCountry: 'Welk land is gemarkeerd?',
+    skip: 'Overslaan',
+    correct: 'Goed',
+    continents: {
+      europe: 'Europa',
+      asia: 'Azië',
+      africa: 'Afrika',
+      'north-america': 'Noord-Amerika',
+      'south-america': 'Zuid-Amerika',
+      oceania: 'Oceanië',
+    },
   },
 
   pt: {
@@ -555,6 +794,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'Essa sala já tem dois jogadores.',
     errTakenOver: 'Abriu o jogo noutro sítio.',
     errGeneric: 'Algo correu mal.',
+    modeMeet: 'Encontrar-se no meio',
+    modeMeetHint: 'Dois inícios secretos. Digam países até os dois lados se juntarem.',
+    modeContinent: 'Preencher um continente',
+    modeContinentHint: 'Sem início. Digam juntos todos os países de um continente.',
+    chooseContinent: 'Que continente?',
+    randomContinent: 'Surpreendam-nos',
+    named: 'Ditos',
+    missed: 'Faltaram',
+    giveUp: 'Mostrar o que falta',
+    filledIt: 'Preencheram tudo',
+    gaveUp: 'Aqui está o resto',
+    rejectWrongContinent: '{country} não fica neste continente.',
+    showOutlines: 'Mostrar contornos',
+    hideOutlines: 'Ocultar contornos',
+    modeIdentify: 'Adivinha o país',
+    modeIdentifyHint: 'Um país acende no mapa. Digam qual é.',
+    whichCountry: 'Que país está destacado?',
+    skip: 'Saltar',
+    correct: 'Certos',
+    continents: {
+      europe: 'Europa',
+      asia: 'Ásia',
+      africa: 'África',
+      'north-america': 'América do Norte',
+      'south-america': 'América do Sul',
+      oceania: 'Oceânia',
+    },
   },
 
   ru: {
@@ -605,6 +871,33 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     errRoomFull: 'В этой комнате уже двое.',
     errTakenOver: 'Вы открыли игру в другом месте.',
     errGeneric: 'Что-то пошло не так.',
+    modeMeet: 'Встретиться посередине',
+    modeMeetHint: 'Два секретных старта. Называйте страны, пока стороны не соединятся.',
+    modeContinent: 'Заполнить материк',
+    modeContinentHint: 'Без старта. Назовите вместе все страны одного материка.',
+    chooseContinent: 'Какой материк?',
+    randomContinent: 'Удивите нас',
+    named: 'Названо',
+    missed: 'Пропущено',
+    giveUp: 'Показать остальное',
+    filledIt: 'Вы заполнили его',
+    gaveUp: 'Вот остальное',
+    rejectWrongContinent: '{country} не на этом материке.',
+    showOutlines: 'Показать границы',
+    hideOutlines: 'Скрыть границы',
+    modeIdentify: 'Угадайте страну',
+    modeIdentifyHint: 'На карте загорается одна страна. Назовите её.',
+    whichCountry: 'Какая страна выделена?',
+    skip: 'Пропустить',
+    correct: 'Верно',
+    continents: {
+      europe: 'Европа',
+      asia: 'Азия',
+      africa: 'Африка',
+      'north-america': 'Северная Америка',
+      'south-america': 'Южная Америка',
+      oceania: 'Океания',
+    },
   },
 }
 

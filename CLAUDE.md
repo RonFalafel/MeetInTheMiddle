@@ -18,8 +18,11 @@ No router, no state library, no database.
 ## Shape of the code
 
 - `src/game/` — pure functions, no React and no Node imports. The graph, the
-  rules, the language tables, and the three hand-curated data tables
-  (`playSet.ts`, `seaLinks.ts`, `names.ts`).
+  rules, the language tables, and the hand-curated data tables (`playSet.ts`,
+  `seaLinks.ts`, `names.ts`, `continents.ts`).
+- `GameState` is a union over three modes. Anything mode-specific narrows on
+  `game.mode` rather than taking optional fields; `applyMove` is generic so a
+  caller holding a `MeetGame` still has one afterwards.
 - `src/game/data/*.generated.ts` — generated. Never edit them; change a curation
   table and run `npm run graph`.
 - `src/ui/` — rendering. `useLocalGame` and `useRoom` both return the same
@@ -65,3 +68,6 @@ testable without a browser — see `server/serve.test.ts`.
 - Adding a language: a row in `LANGUAGES`, its `Strings` block, then
   `npm run graph`. Country names come from CLDR, so only the interface text is
   hand-written.
+- A `GameRequest` is what the lobby asks for; a `Setup` is what was dealt and is
+  what travels on the wire. Do not merge them — a request may leave the start
+  pair open, a setup never may, or a reconnecting phone rejoins a different game.

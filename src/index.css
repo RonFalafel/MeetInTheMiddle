@@ -168,11 +168,17 @@ circle.tiny.player-1 {
   opacity: 0.85;
 }
 
-.reset-zoom {
+.map-buttons {
   position: absolute;
   inset-inline-end: 0.5rem;
   bottom: 0.5rem;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.map-buttons button {
   padding: 0.4rem 0.7rem;
+  font: inherit;
   font-size: 0.8rem;
   color: var(--text);
   background: rgb(15 18 24 / 85%);
@@ -540,4 +546,69 @@ button {
 [dir='rtl'] .map,
 [dir='rtl'] .roombar .code {
   direction: ltr;
+}
+
+/* ------------------------------------------------ continents and game modes */
+
+/*
+ * What a continent game shows once it is over: the countries nobody got,
+ * outlined rather than filled, so they read as absence rather than score.
+ */
+.land.missed {
+  fill: var(--bad);
+  fill-opacity: 0.18;
+  stroke: var(--bad);
+  stroke-opacity: 0.55;
+}
+
+.continent-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.continent-grid button {
+  padding: 0.9rem 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.continent-grid button:hover {
+  border-color: var(--p0);
+}
+
+.chip.give-up {
+  margin-inline-start: auto;
+}
+
+.chips.missed h3 {
+  color: var(--bad);
+}
+
+.chips.missed li {
+  border-color: rgb(255 154 139 / 35%);
+}
+
+.who {
+  flex-wrap: wrap;
+}
+
+/*
+ * The country being asked about in "name that country". Deliberately loud and
+ * deliberately unlabelled — with outlines off it is the only thing on screen.
+ */
+.land.highlight {
+  fill: var(--p0);
+  fill-opacity: 1;
+  stroke: var(--text);
+  stroke-opacity: 0.6;
+}
+
+circle.tiny.highlight {
+  fill: var(--p0);
+  stroke: var(--text);
 }

@@ -19,4 +19,11 @@ export const SETTINGS = {
    * turning it off makes the game much harder.
    */
   showCountriesNeeded: true,
+  /**
+   * Draw the countries nobody has named yet. Off is the Travle experience:
+   * an empty ocean that fills in only where you were right, so you are
+   * recalling the world rather than reading it. This is only the starting
+   * value — there is a toggle on the map, remembered per device.
+   */
+  showOutlines: true,
 }
