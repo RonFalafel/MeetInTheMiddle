@@ -257,6 +257,10 @@ input:focus-visible {
   border-radius: 9px;
   max-height: 14rem;
   overflow-y: auto;
+  /* Let a finger scroll this list rather than the page behind it. */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .suggestions button {
@@ -768,4 +772,45 @@ circle.tiny.highlight {
 
 .two-up button.big.player-1 {
   border-color: var(--p1);
+}
+
+/* The title doubles as the way back to the mode list. */
+button.title {
+  padding: 0;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: none;
+  border: 0;
+  text-align: start;
+}
+
+button.title:hover {
+  color: var(--p0);
+}
+
+@media (min-width: 40rem) {
+  button.title {
+    font-size: 1.3rem;
+  }
+}
+
+/* What the last answer was, so a wrong tap still teaches something. */
+.last-answer {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.last-answer strong {
+  color: var(--text);
+}
+
+.last-answer.right strong {
+  color: var(--p1);
+}
+
+.last-answer.wrong strong {
+  color: var(--bad);
 }

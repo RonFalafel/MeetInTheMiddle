@@ -178,6 +178,11 @@ blue-to-red ramp was tried first and read wrong: on a dark map a cold blue
 guess is barely distinguishable from unguessed land, so far guesses looked like
 they had not registered. Every guess is now visibly red; how red is the clue.
 
+Heat is `1 - (distance / 20,000 km) ^ 0.6`. The exponent is doing real work: an
+exponential decay collapses everything past a few thousand kilometres into one
+shade, and a linear ramp flattens the near end instead. A root curve spreads
+both, so every distance band gets its own visible step.
+
 Distance is great-circle between centroids, and the colour falls off
 exponentially with a 3,000 km scale. A linear ramp leaves the whole of Europe
 within one shade of itself; this way a neighbour reads around 0.85, the far side
@@ -185,11 +190,44 @@ of a continent around 0.5, and another continent below 0.1.
 
 | From France | | heat |
 | --- | --- | --- |
-| Belgium | 480 km | 0.85 |
-| Poland | 1,370 km | 0.63 |
-| Egypt | 3,286 km | 0.33 |
-| United States | 7,644 km | 0.08 |
-| Australia | 15,192 km | 0.01 |
+| Belgium | 480 km | 0.89 |
+| Poland | 1,370 km | 0.80 |
+| Egypt | 3,286 km | 0.66 |
+| United States | 7,644 km | 0.44 |
+| Australia | 15,192 km | 0.15 |
+| New Zealand | 19,044 km | 0.03 |
+
+## What the map may give away
+
+The map opens framed on something useful only where that cannot answer the
+question:
+
+| Mode | Opens on |
+| --- | --- |
+| Meet in the middle | Your own start |
+| Fill a continent | The continent (already stated) |
+| Name the neighbours | The hub (already named) |
+| Bigger or smaller | Both countries (both named on the buttons) |
+| The long way round | The head of the chain |
+| Name that country | The country — it *is* the question |
+| Capitals, Flags, Which continent?, Hot and cold | Nothing; the whole world |
+
+Framing the answer in the capital and flag rounds was handing them over, which
+is why those four stay put.
+
+**Clue** is the deliberate version of that. Pressing it zooms the map to 3× and
+puts the country in frame but **off centre** — dead centre would be as good as
+naming it. The offset is derived from the country code, so asking twice moves
+the map to the same place rather than jittering.
+
+## Learning as you go
+
+Rounds that move on regardless of the answer say what the answer was:
+
+- **Name that country / Capitals / Flags** — **Reveal** gives up on the current
+  question and shows what it was, rather than skipping in silence.
+- **Bigger or smaller / Which continent?** — every answer is followed by what
+  the right one was, since a wrong tap otherwise teaches nothing.
 
 ## Showing the map
 

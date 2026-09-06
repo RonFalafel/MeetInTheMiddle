@@ -64,8 +64,26 @@ describe('heat', () => {
   })
 
   it('separates a neighbour from another continent, which is the whole point', () => {
-    expect(heatOf(game, 'BEL')).toBeGreaterThan(0.7)
-    expect(heatOf(game, 'AUS')).toBeLessThan(0.05)
+    expect(heatOf(game, 'BEL')).toBeGreaterThan(0.8)
+    expect(heatOf(game, 'AUS')).toBeLessThan(0.3)
+    expect(heatOf(game, 'BEL') - heatOf(game, 'AUS')).toBeGreaterThan(0.6)
+  })
+
+  it('keeps distant guesses apart from each other, not all pinned at zero', () => {
+    // The first curve was exponential and collapsed everything past a few
+    // thousand kilometres into one indistinguishable shade, which is the whole
+    // reason this one is a root rather than a decay.
+    const bands = ['DEU', 'EGY', 'KEN', 'BRA', 'AUS', 'NZL']
+    const heats = bands.map((code) => heatOf(game, code))
+    for (let i = 1; i < heats.length; i++) {
+      const step = heats[i - 1]! - heats[i]!
+      expect(step, `${bands[i - 1]} to ${bands[i]}`).toBeGreaterThan(0.04)
+    }
+  })
+
+  it('uses most of the range, so the colour ramp has something to work with', () => {
+    const spread = heatOf(game, 'BEL') - heatOf(game, 'NZL')
+    expect(spread).toBeGreaterThan(0.8)
   })
 })
 

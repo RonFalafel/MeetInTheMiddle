@@ -55,6 +55,10 @@ npm run sync
 - **Hot and cold** — one secret country, and every guess is coloured by how
   close it is, with bordering guesses called out. Globle, on our map.
 
+Tap the title to get back to this list. Rounds that move on regardless of your
+answer tell you what the answer was, and **Clue** zooms the map to the country
+without centring it, for when a capital or a flag means nothing to you.
+
 Only the first needs a partner. The rest are as good on your own.
 
 There is a **map outline toggle** next to the zoom controls. With outlines off

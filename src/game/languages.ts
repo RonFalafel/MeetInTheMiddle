@@ -157,6 +157,9 @@ export type Strings = {
   modeWhichContinentHint: string
   whichContinentIs: string
   roundOver: string
+  revealAnswer: string
+  itWas: string
+  clue: string
   continents: Readonly<Record<ContinentId, string>>
 }
 
@@ -259,6 +262,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'A country lights up. Tap the continent it is on.',
     whichContinentIs: 'Which continent is this?',
     roundOver: 'Round over',
+    revealAnswer: 'Reveal',
+    itWas: 'It was {answer}',
+    clue: 'Clue',
     continents: {
       europe: 'Europe',
       asia: 'Asia',
@@ -367,6 +373,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'מדינה נדלקת. הקישו על היבשת שלה.',
     whichContinentIs: 'באיזו יבשת זה?',
     roundOver: 'סוף הסיבוב',
+    revealAnswer: 'לגלות',
+    itWas: 'זו הייתה {answer}',
+    clue: 'רמז',
     continents: {
       europe: 'אירופה',
       asia: 'אסיה',
@@ -475,6 +484,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'تضيء دولة. اضغط على قارتها.',
     whichContinentIs: 'في أي قارة تقع؟',
     roundOver: 'انتهت الجولة',
+    revealAnswer: 'اكشف',
+    itWas: 'كانت {answer}',
+    clue: 'تلميح',
     continents: {
       europe: 'أوروبا',
       asia: 'آسيا',
@@ -583,6 +595,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Se ilumina un país. Toca su continente.',
     whichContinentIs: '¿En qué continente está?',
     roundOver: 'Fin de la ronda',
+    revealAnswer: 'Revelar',
+    itWas: 'Era {answer}',
+    clue: 'Pista',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -691,6 +706,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Un pays s’allume. Touchez son continent.',
     whichContinentIs: 'Sur quel continent est-il ?',
     roundOver: 'Manche terminée',
+    revealAnswer: 'Révéler',
+    itWas: 'C’était {answer}',
+    clue: 'Indice',
     continents: {
       europe: 'Europe',
       asia: 'Asie',
@@ -799,6 +817,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Ein Land leuchtet auf. Tippe auf seinen Kontinent.',
     whichContinentIs: 'Auf welchem Kontinent liegt es?',
     roundOver: 'Runde vorbei',
+    revealAnswer: 'Auflösen',
+    itWas: 'Es war {answer}',
+    clue: 'Tipp',
     continents: {
       europe: 'Europa',
       asia: 'Asien',
@@ -907,6 +928,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Si illumina un paese. Tocca il suo continente.',
     whichContinentIs: 'In quale continente si trova?',
     roundOver: 'Turno finito',
+    revealAnswer: 'Rivela',
+    itWas: 'Era {answer}',
+    clue: 'Indizio',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -1015,6 +1039,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Er licht een land op. Tik op het werelddeel.',
     whichContinentIs: 'In welk werelddeel ligt dit?',
     roundOver: 'Ronde voorbij',
+    revealAnswer: 'Onthullen',
+    itWas: 'Het was {answer}',
+    clue: 'Hint',
     continents: {
       europe: 'Europa',
       asia: 'Azië',
@@ -1123,6 +1150,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Acende um país. Toquem no continente dele.',
     whichContinentIs: 'Em que continente fica?',
     roundOver: 'Fim da ronda',
+    revealAnswer: 'Revelar',
+    itWas: 'Era {answer}',
+    clue: 'Pista',
     continents: {
       europe: 'Europa',
       asia: 'Ásia',
@@ -1231,6 +1261,9 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     modeWhichContinentHint: 'Загорается страна. Нажмите её материк.',
     whichContinentIs: 'На каком материке это?',
     roundOver: 'Раунд окончен',
+    revealAnswer: 'Показать',
+    itWas: 'Это была {answer}',
+    clue: 'Подсказка',
     continents: {
       europe: 'Европа',
       asia: 'Азия',

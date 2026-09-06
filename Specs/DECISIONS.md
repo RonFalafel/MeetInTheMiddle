@@ -253,3 +253,37 @@ Worth recording how it survived a check: the verification read the `fill`
 *attribute* back and found it set, which proved nothing about what was drawn.
 Anything about appearance has to be checked with `getComputedStyle` or a
 screenshot, not by reading back the value that was just written.
+
+## 2026-09-06 — the round of fixes that came from actually playing it
+
+**The heat curve is a root, not a decay.** Third attempt at this. Exponential
+(`e^-d/3000`) put every guess past a few thousand kilometres into the same
+shade; linear flattened the near end instead. `1 - (d/20000)^0.6` spreads both,
+and the colour ramp widened with it — lightness 28–58%, saturation 35–90%. The
+observed spread went from a 19-point range in the red channel to 90. There are
+tests asserting the bands stay apart, so this cannot quietly regress again.
+
+**The map no longer frames the answer.** Capitals, flags and which-continent
+were centring the map on the country being asked about, which gave the game
+away outright — the position *is* the question in all three. They now open on
+the whole world, and so does hot/cold.
+
+**Clue is the deliberate version.** It zooms to 3× and puts the country in frame
+but off centre, with the offset derived from the country code so it is stable
+between presses. Centring would be the same as answering.
+
+**Reveal replaced Skip.** Skipping moved on in silence, which wastes the one
+moment you are most likely to remember something. Reveal shows what it was. The
+underlying move is still `SKIP` and still counts as missed — only the framing
+changed, plus the same idea applied to the two tap-through modes, which now say
+what the right answer was after every question.
+
+**Suggestions were selecting on `pointerdown`.** That fires the instant a finger
+lands, so on a phone scrolling the list picked whatever happened to be under the
+touch — the list could not be scrolled at all. Now `onClick` selects and
+`onMouseDown` only suppresses the desktop blur; a touch generates its mousedown
+after the tap, so scrolling is unaffected. The list also got `touch-action:
+pan-y` and `overscroll-behavior: contain`.
+
+**The title goes home.** It was the only screen with no way back to the mode
+list short of the browser's back button.

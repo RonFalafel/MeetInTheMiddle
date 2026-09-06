@@ -470,6 +470,17 @@ function correctAnswers(state: IdentifyGame): { code: CountryCode; player: Playe
     .map((row) => ({ code: row.target, player: row.move.player }))
 }
 
+/**
+ * The answer a reveal just gave away, or null. Used to show what it was before
+ * the round moves on, which is the whole point of revealing rather than skipping.
+ */
+export function justRevealed(state: IdentifyGame): CountryCode | null {
+  const last = state.moves[state.moves.length - 1]
+  if (!last || last.code !== SKIP) return null
+  const { rows } = answered(state)
+  return rows[rows.length - 1]?.target ?? null
+}
+
 /** The country highlighted right now, or null once the round is done. */
 export function currentTarget(state: IdentifyGame): CountryCode | null {
   return state.order[answered(state).index] ?? null
@@ -546,19 +557,24 @@ export function kilometresBetween(a: CountryCode, b: CountryCode): number {
 }
 
 /**
- * How fast the colour cools, in kilometres.
- *
- * Exponential rather than linear because a linear ramp leaves the whole of
- * Europe within one shade of itself: at this scale neighbours read around 0.85,
- * the far side of a continent around 0.5, and another continent below 0.1,
- * which is the spread that makes the map worth reading.
+ * The far side of the world, near enough. Everything is scaled against this so
+ * that the whole planet uses the whole gradient.
  */
-const HEAT_SCALE_KM = 3000
+const ANTIPODAL_KM = 20000
 
-/** 0 for freezing, 1 for the country itself. */
+/**
+ * 0 for the far side of the world, 1 for the country itself.
+ *
+ * The exponent is the whole trick. Exponential decay (the first attempt) put
+ * every guess beyond a few thousand kilometres into the same dark shade, so a
+ * board full of far guesses was a board of identical squares. A plain linear
+ * ramp has the opposite fault and leaves all of Europe one colour. A root curve
+ * spreads both ends: every distance band gets its own visible step.
+ */
 export function heatOf(state: HotColdGame, code: CountryCode): number {
   if (code === state.target) return 1
-  return Math.exp(-kilometresBetween(code, state.target) / HEAT_SCALE_KM)
+  const share = Math.min(1, kilometresBetween(code, state.target) / ANTIPODAL_KM)
+  return 1 - share ** 0.6
 }
 
 export function hotColdGame(target: CountryCode): HotColdGame {
@@ -713,6 +729,30 @@ export function dealWhichContinent(random: Random = Math.random): WhichContinent
 
 export function currentCountry(state: WhichContinentGame): CountryCode | null {
   return state.order[state.moves.length] ?? null
+}
+
+/**
+ * How the last question went, once it has moved on. These two modes advance on
+ * any answer, so without this a wrong tap teaches nothing.
+ */
+export function previousAnswer(
+  state: CompareGame | WhichContinentGame,
+): { readonly answer: string; readonly right: boolean } | null {
+  const index = state.moves.length - 1
+  const move = state.moves[index]
+  if (!move) return null
+
+  if (state.mode === 'compare') {
+    const pair = state.pairs[index]
+    if (!pair) return null
+    const answer = biggerOf(pair)
+    return { answer, right: move.code === answer }
+  }
+
+  const code = state.order[index]
+  if (!code) return null
+  const answer = continentOf(code)!
+  return { answer, right: move.code === answer }
 }
 
 // ------------------------------------------------- scoring the tap-through modes

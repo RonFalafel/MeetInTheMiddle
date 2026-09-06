@@ -17,6 +17,8 @@ import {
   compareScore,
   currentCountry,
   currentPair,
+  justRevealed,
+  previousAnswer,
   hotColdGuesses,
   identifyScore,
   lastGuess,
@@ -88,11 +90,14 @@ export default function App() {
 function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
   const { t, name } = useLanguage()
   const { game, me } = session
+  // Bumped rather than set, so asking for the same country twice still moves
+  // the map — a clue you cannot repeat is a clue you can lose.
+  const [clue, setClue] = useState<{ code: CountryCode; nonce: number } | null>(null)
 
   if (!game) {
     return (
       <main>
-        <Header />
+        <Header onLeave={onLeave} />
         <section className="panel">
           <p>{session.notice ? describeNotice(session.notice, t, name) : t.connecting}</p>
           <button type="button" onClick={onLeave}>
@@ -115,7 +120,7 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
 
   return (
     <main>
-      <Header game={game} />
+      <Header game={game} onLeave={onLeave} />
 
       {session.roomCode && <RoomBar session={session} onLeave={onLeave} />}
 
@@ -128,12 +133,17 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         missed={missed}
         highlight={highlightFor(game, over)}
         heat={game.mode === 'hot-cold' ? heatMap(game) : undefined}
+        clue={clue}
       />
 
       {over ? (
         <Summary game={game} session={session} />
       ) : (
-        <Play session={session} game={game} />
+        <Play
+          session={session}
+          game={game}
+          onClue={(code) => setClue((current) => ({ code, nonce: (current?.nonce ?? 0) + 1 }))}
+        />
       )}
 
       {(game.mode === 'meet' || game.mode === 'continent' || game.mode === 'neighbours') && (
@@ -173,25 +183,44 @@ function highlightFor(game: GameState, over: boolean): CountryCode | null {
 }
 
 /** What the map should be looking at when it opens. */
+/**
+ * Where the map opens.
+ *
+ * Anywhere the country's position is part of the question, this returns nothing
+ * and the map stays on the whole world — framing the answer was giving capitals,
+ * flags and which-continent away outright. The clue button exists for when you
+ * do want the map to help.
+ */
 function mapFocus(game: GameState, me: PlayerIndex): readonly CountryCode[] {
   if (game.mode === 'meet') return [game.starts[me]]
   if (game.mode === 'continent') return continentTargets(game)
-  if (game.mode === 'neighbours') return [game.hub, ...neighbourTargets(game)]
-  // Hot/cold must not open looking at the answer, so it stays on the world.
-  if (game.mode === 'hot-cold') return []
+  // The hub is named in the prompt, so framing it gives nothing away.
+  if (game.mode === 'neighbours') return [game.hub]
   if (game.mode === 'chain') return [chainHead(game)]
+  // Both countries are named on the buttons, so the map cannot spoil anything.
   if (game.mode === 'compare') return currentPair(game) ?? []
-  if (game.mode === 'which-continent') return [currentCountry(game) ?? game.order[0]!]
-  // Identify follows the country being asked about, which moves each round.
-  return [currentTarget(game) ?? game.order[0]!]
+  // Hot/cold, which-continent, and the capital and flag prompts all hide where
+  // the country is, which is exactly what is being asked.
+  if (game.mode === 'identify' && game.prompt === 'shape') {
+    return [currentTarget(game) ?? game.order[0]!]
+  }
+  return []
 }
 
-function Header({ game }: { game?: GameState }) {
+function Header({ game, onLeave }: { game?: GameState; onLeave?: () => void }) {
   const { t } = useLanguage()
 
   return (
     <header>
-      <h1>{t.title}</h1>
+      {onLeave ? (
+        <h1>
+          <button type="button" className="title" onClick={onLeave}>
+            {t.title}
+          </button>
+        </h1>
+      ) : (
+        <h1>{t.title}</h1>
+      )}
       {game && (
         <p className="score">
           {game.mode === 'meet' ? (
@@ -296,12 +325,22 @@ function RoomBar({ session, onLeave }: { session: Session; onLeave: () => void }
   )
 }
 
-function Play({ session, game }: { session: Session; game: GameState }) {
+function Play({
+  session,
+  game,
+  onClue,
+}: {
+  session: Session
+  game: GameState
+  onClue: (code: CountryCode) => void
+}) {
   const { t, name } = useLanguage()
   const { me, setMe, guess, notice } = session
 
   if (game.mode === 'compare') return <ComparePlay game={game} onPick={guess} />
-  if (game.mode === 'which-continent') return <ContinentPlay game={game} onPick={guess} />
+  if (game.mode === 'which-continent') {
+    return <ContinentPlay game={game} onPick={guess} onClue={onClue} />
+  }
 
   return (
     <section className="panel">
@@ -352,6 +391,12 @@ function Play({ session, game }: { session: Session; game: GameState }) {
               {identifyScore(game).asked + 1}/{identifyScore(game).total}
             </em>
           </p>
+          {justRevealed(game) && (
+            <p className="last-answer wrong">
+              {format(t.itWas, { answer: '' })}
+              <strong>{name(justRevealed(game)!)}</strong>
+            </p>
+          )}
         </>
       )}
 
@@ -375,9 +420,18 @@ function Play({ session, game }: { session: Session; game: GameState }) {
             ))}
           </>
         )}
+        {game.mode === 'identify' && game.prompt !== 'shape' && currentTarget(game) && (
+          <button
+            type="button"
+            className="chip"
+            onClick={() => onClue(currentTarget(game)!)}
+          >
+            {t.clue}
+          </button>
+        )}
         {game.mode === 'identify' && (
           <button type="button" className="chip give-up" onClick={() => guess(SKIP)}>
-            {t.skip}
+            {t.revealAnswer}
           </button>
         )}
       </div>
@@ -560,6 +614,7 @@ function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: strin
           {score.asked + 1}/{score.total}
         </em>
       </p>
+      <LastAnswer game={game} />
       <div className="two-up">
         {pair.map((code, index) => (
           <button key={code} type="button" className={`big player-${index}`} onClick={() => onPick(code)}>
@@ -575,12 +630,15 @@ function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: strin
 function ContinentPlay({
   game,
   onPick,
+  onClue,
 }: {
   game: WhichContinentGame
   onPick: (code: string) => void
+  onClue: (code: CountryCode) => void
 }) {
   const { t } = useLanguage()
   const score = whichContinentScore(game)
+  const target = currentCountry(game)
 
   return (
     <section className="panel">
@@ -591,6 +649,7 @@ function ContinentPlay({
           {score.asked + 1}/{score.total}
         </em>
       </p>
+      <LastAnswer game={game} />
       <div className="continent-grid">
         {CONTINENT_IDS.map((id) => (
           <button key={id} type="button" onClick={() => onPick(id)}>
@@ -598,7 +657,34 @@ function ContinentPlay({
           </button>
         ))}
       </div>
+      {target && (
+        <div className="who">
+          <button type="button" className="chip" onClick={() => onClue(target)}>
+            {t.clue}
+          </button>
+        </div>
+      )}
     </section>
+  )
+}
+
+/**
+ * What the previous question's answer was. Both tap-through modes move on
+ * whatever you press, so without this a wrong answer teaches nothing.
+ */
+function LastAnswer({ game }: { game: CompareGame | WhichContinentGame }) {
+  const { t, name } = useLanguage()
+  const previous = previousAnswer(game)
+  if (!previous) return null
+
+  const label =
+    game.mode === 'compare' ? name(previous.answer) : t.continents[previous.answer as ContinentId]
+
+  return (
+    <p className={`last-answer ${previous.right ? 'right' : 'wrong'}`}>
+      {format(t.itWas, { answer: '' })}
+      <strong>{label}</strong>
+    </p>
   )
 }
 

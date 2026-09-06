@@ -83,12 +83,13 @@ export function GuessInput({ game, onGuess, disabled }: GuessInputProps) {
               <button
                 type="button"
                 className={index === highlighted ? 'active' : undefined}
-                // onPointerDown, not onClick: the input blurs before a click fires,
-                // which on a phone closes the keyboard and jumps the layout.
-                onPointerDown={(event) => {
-                  event.preventDefault()
-                  submit(name(country.code))
-                }}
+                // Click, not pointerdown. Selecting on pointerdown meant a
+                // scroll gesture picked whatever was under the finger when it
+                // landed, so the list could not be scrolled on a phone at all.
+                // Only the mouse needs the blur suppressed; a touch generates
+                // its mousedown after the tap, so scrolling is unaffected.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => submit(name(country.code))}
               >
                 {name(country.code)}
               </button>

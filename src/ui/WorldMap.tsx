@@ -42,6 +42,9 @@ projection.translate([translateX, translateY - top])
 
 const path = geoPath(projection)
 
+/** How far a clue zooms in. Enough to find the country, not enough to name it for you. */
+const CLUE_ZOOM = 3
+
 /** Below this many square pixels a country is invisible and gets a dot instead. */
 const TOO_SMALL = 6
 
@@ -74,10 +77,14 @@ for (const shape of SHAPES) {
  * guess is barely distinguishable from unguessed land, so far guesses looked
  * like they had not registered. Every guess is now visibly red; how red is the
  * clue. Built here rather than in CSS because the value is continuous.
+ *
+ * The span is deliberately wide — lightness 28% to 58%, saturation 35% to 90% —
+ * because a narrow one made every guess look alike, which was the complaint
+ * that produced this version.
  */
 export function heatColour(heat: number): string {
   const clamped = Math.min(1, Math.max(0, heat))
-  return `hsl(${14 - 14 * clamped} ${45 + 40 * clamped}% ${34 + 22 * clamped}%)`
+  return `hsl(${22 - 22 * clamped} ${35 + 55 * clamped}% ${28 + 30 * clamped}%)`
 }
 
 const projectCentroid = (code: CountryCode): [number, number] | null => {
@@ -135,6 +142,8 @@ export type WorldMapProps = {
   readonly highlight?: CountryCode | null
   /** Hot/cold: 0 for freezing, 1 for the answer. Colours the guess itself. */
   readonly heat?: ReadonlyMap<CountryCode, number>
+  /** Asking for a clue frames this country. Bump `nonce` to ask again. */
+  readonly clue?: { readonly code: CountryCode; readonly nonce: number } | null
 }
 
 export function WorldMap({
@@ -146,6 +155,7 @@ export function WorldMap({
   missed,
   highlight,
   heat,
+  clue,
 }: WorldMapProps) {
   const { t } = useLanguage()
   const { transform, surfaceProps, reset, centreOn, moved } = useZoomPan(WIDTH, HEIGHT)
@@ -174,6 +184,22 @@ export function WorldMap({
   }, [claimed, hiddenPlayer])
 
   const missedSet = useMemo(() => new Set(missed ?? []), [missed])
+
+  // A clue frames the country without centring it: dead centre would be as good
+  // as telling you, whereas somewhere in the frame still leaves you looking.
+  const clueNonce = clue?.nonce
+  const clueCode = clue?.code
+  useEffect(() => {
+    if (!clueCode || clueNonce === undefined) return
+    const point = projectCentroid(clueCode)
+    if (!point) return
+
+    // Stable per country, so asking twice does not jiggle the map about.
+    const wobble = [...clueCode].reduce((total, ch) => total + ch.charCodeAt(0), 0)
+    const offsetX = (wobble % 2 ? 1 : -1) * 0.24 * (WIDTH / CLUE_ZOOM)
+    const offsetY = (wobble % 3 ? 1 : -1) * 0.2 * (HEIGHT / CLUE_ZOOM)
+    centreOn({ x: point[0] + offsetX, y: point[1] + offsetY }, CLUE_ZOOM)
+  }, [clueCode, clueNonce, centreOn])
 
   const routeLine = useMemo(() => {
     if (!route || route.length < 2) return null
