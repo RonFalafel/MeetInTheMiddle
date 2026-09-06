@@ -141,6 +141,15 @@ export type Strings = {
   guesses: string
   foundIt: string
   theAnswer: string
+  bordersIt: string
+  modeFlags: string
+  modeFlagsHint: string
+  whichFlag: string
+  modeChain: string
+  modeChainHint: string
+  chainPrompt: string
+  chainLength: string
+  rejectNotAdjacent: string
   continents: Readonly<Record<ContinentId, string>>
 }
 
@@ -227,6 +236,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Guesses',
     foundIt: 'Found it',
     theAnswer: 'The answer',
+    bordersIt: 'Borders the answer!',
+    modeFlags: 'Flags',
+    modeFlagsHint: 'A flag is shown. Say which country flies it.',
+    whichFlag: 'Whose flag is this?',
+    modeChain: 'The long way round',
+    modeChainHint: 'Start somewhere and keep going, one border at a time. How far can you get?',
+    chainPrompt: 'Keep going from {country}',
+    chainLength: 'Chain',
+    rejectNotAdjacent: '{country} does not border it.',
     continents: {
       europe: 'Europe',
       asia: 'Asia',
@@ -319,6 +337,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'ניחושים',
     foundIt: 'מצאתם',
     theAnswer: 'התשובה',
+    bordersIt: 'גובלת בתשובה!',
+    modeFlags: 'דגלים',
+    modeFlagsHint: 'מוצג דגל. אמרו של איזו מדינה הוא.',
+    whichFlag: 'של מי הדגל הזה?',
+    modeChain: 'הדרך הארוכה',
+    modeChainHint: 'התחילו איפשהו והמשיכו, גבול אחרי גבול. עד לאן תגיעו?',
+    chainPrompt: 'המשיכו מ{country}',
+    chainLength: 'שרשרת',
+    rejectNotAdjacent: '{country} לא גובלת בה.',
     continents: {
       europe: 'אירופה',
       asia: 'אסיה',
@@ -411,6 +438,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'تخمينات',
     foundIt: 'وجدتها',
     theAnswer: 'الإجابة',
+    bordersIt: 'تحد الإجابة!',
+    modeFlags: 'الأعلام',
+    modeFlagsHint: 'يُعرض عَلَم. قل لأي دولة يعود.',
+    whichFlag: 'عَلَم من هذا؟',
+    modeChain: 'الطريق الطويل',
+    modeChainHint: 'ابدأ من مكان وواصل، حدودًا تلو الأخرى. إلى أين تصل؟',
+    chainPrompt: 'واصل من {country}',
+    chainLength: 'سلسلة',
+    rejectNotAdjacent: '{country} لا تحدها.',
     continents: {
       europe: 'أوروبا',
       asia: 'آسيا',
@@ -503,6 +539,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Intentos',
     foundIt: 'Lo encontrasteis',
     theAnswer: 'La respuesta',
+    bordersIt: '¡Limita con la respuesta!',
+    modeFlags: 'Banderas',
+    modeFlagsHint: 'Se muestra una bandera. Di de qué país es.',
+    whichFlag: '¿De quién es esta bandera?',
+    modeChain: 'El camino largo',
+    modeChainHint: 'Empieza en algún sitio y sigue, frontera a frontera. ¿Hasta dónde llegáis?',
+    chainPrompt: 'Sigue desde {country}',
+    chainLength: 'Cadena',
+    rejectNotAdjacent: '{country} no limita con él.',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -595,6 +640,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Essais',
     foundIt: 'Trouvé',
     theAnswer: 'La réponse',
+    bordersIt: 'Elle borde la réponse !',
+    modeFlags: 'Drapeaux',
+    modeFlagsHint: 'Un drapeau est affiché. Dites de quel pays.',
+    whichFlag: 'À qui est ce drapeau ?',
+    modeChain: 'Le chemin le plus long',
+    modeChainHint: 'Partez quelque part et continuez, frontière après frontière. Jusqu’où irez-vous ?',
+    chainPrompt: 'Continuez depuis {country}',
+    chainLength: 'Chaîne',
+    rejectNotAdjacent: '{country} ne le borde pas.',
     continents: {
       europe: 'Europe',
       asia: 'Asie',
@@ -687,6 +741,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Versuche',
     foundIt: 'Gefunden',
     theAnswer: 'Die Antwort',
+    bordersIt: 'Grenzt an die Antwort!',
+    modeFlags: 'Flaggen',
+    modeFlagsHint: 'Eine Flagge erscheint. Sag zu welchem Land sie gehört.',
+    whichFlag: 'Wessen Flagge ist das?',
+    modeChain: 'Der lange Weg',
+    modeChainHint: 'Fang irgendwo an und mach weiter, Grenze für Grenze. Wie weit kommt ihr?',
+    chainPrompt: 'Weiter von {country}',
+    chainLength: 'Kette',
+    rejectNotAdjacent: '{country} grenzt nicht daran.',
     continents: {
       europe: 'Europa',
       asia: 'Asien',
@@ -779,6 +842,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Tentativi',
     foundIt: 'Trovato',
     theAnswer: 'La risposta',
+    bordersIt: 'Confina con la risposta!',
+    modeFlags: 'Bandiere',
+    modeFlagsHint: 'Viene mostrata una bandiera. Di quale paese è?',
+    whichFlag: 'Di chi è questa bandiera?',
+    modeChain: 'La strada lunga',
+    modeChainHint: 'Partite da qualche parte e continuate, un confine alla volta. Fin dove arrivate?',
+    chainPrompt: 'Continua da {country}',
+    chainLength: 'Catena',
+    rejectNotAdjacent: '{country} non ci confina.',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -871,6 +943,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Pogingen',
     foundIt: 'Gevonden',
     theAnswer: 'Het antwoord',
+    bordersIt: 'Grenst aan het antwoord!',
+    modeFlags: 'Vlaggen',
+    modeFlagsHint: 'Er verschijnt een vlag. Zeg van welk land die is.',
+    whichFlag: 'Van wie is deze vlag?',
+    modeChain: 'De lange weg',
+    modeChainHint: 'Begin ergens en ga door, grens na grens. Hoe ver komen jullie?',
+    chainPrompt: 'Ga verder vanaf {country}',
+    chainLength: 'Ketting',
+    rejectNotAdjacent: '{country} grenst er niet aan.',
     continents: {
       europe: 'Europa',
       asia: 'Azië',
@@ -963,6 +1044,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Tentativas',
     foundIt: 'Encontraram',
     theAnswer: 'A resposta',
+    bordersIt: 'Faz fronteira com a resposta!',
+    modeFlags: 'Bandeiras',
+    modeFlagsHint: 'É mostrada uma bandeira. Digam de que país é.',
+    whichFlag: 'De quem é esta bandeira?',
+    modeChain: 'O caminho longo',
+    modeChainHint: 'Comecem algures e continuem, fronteira a fronteira. Até onde chegam?',
+    chainPrompt: 'Continuem a partir de {country}',
+    chainLength: 'Cadeia',
+    rejectNotAdjacent: '{country} não faz fronteira com ele.',
     continents: {
       europe: 'Europa',
       asia: 'Ásia',
@@ -1055,6 +1145,15 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     guesses: 'Попытки',
     foundIt: 'Нашли',
     theAnswer: 'Ответ',
+    bordersIt: 'Граничит с ответом!',
+    modeFlags: 'Флаги',
+    modeFlagsHint: 'Показан флаг. Назовите его страну.',
+    whichFlag: 'Чей это флаг?',
+    modeChain: 'Длинный путь',
+    modeChainHint: 'Начните где-нибудь и продолжайте, граница за границей. Как далеко зайдёте?',
+    chainPrompt: 'Продолжайте от {country}',
+    chainLength: 'Цепочка',
+    rejectNotAdjacent: '{country} с ней не граничит.',
     continents: {
       europe: 'Европа',
       asia: 'Азия',

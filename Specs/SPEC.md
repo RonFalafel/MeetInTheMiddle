@@ -10,14 +10,16 @@ rules plumbing; only the goal changes.
 | Fill a continent | Name every country in one continent | Nothing is left, or you give up |
 | Name that country | Say which country is lit up | Ten rounds are done |
 | Capital cities | Say whose capital that is | Ten rounds are done |
+| Flags | Say whose flag that is | Ten rounds are done |
 | Name the neighbours | Name everything bordering one country | Nothing is left, or you give up |
+| The long way round | Walk as far as you can, border by border | You run dry, or you give up |
 | Hot and cold | Find one secret country | You name it, or you give up |
 
 Only Meet in the middle needs a partner. The rest are as good alone.
 
-Internally there are five modes, not six: Capital cities is
-`mode: 'identify'` with `prompt: 'capital'`, because the machinery is identical
-and only the question changes.
+Internally there are six modes, not eight: Capital cities and Flags are both
+`mode: 'identify'` with a different `prompt`, because the machinery is
+identical and only the question changes.
 
 This describes the game **as it is**, not as it was first imagined. When the
 built game and this file disagree, the game is right and this file is stale —
@@ -102,6 +104,12 @@ every language but there is no equivalent for cities in the browser, so the
 prompt stays Latin even when the game is in Hebrew. The answer is a country
 name, which is translated.
 
+**Flags** is the same again with a picture. Flags come from `flag-icons` and are
+copied into `public/flags/` at build time by `npm run flags`, which runs
+automatically before a build. They are static files, not bundled: 1.3 MB of SVG
+has no business in the JavaScript, and a round only ever shows ten of them.
+Kosovo has no ISO code but flag-icons ships `xk`, which is what everyone uses.
+
 This mode is where the outline toggle earns its keep: with outlines off, the
 lit country is the only thing drawn, so you are identifying a shape with no
 surrounding context at all.
@@ -116,19 +124,36 @@ The autocomplete deliberately does **not** narrow to the answers. Offering only
 the nine countries that border Germany would be an answer sheet, so it offers
 everything on the same landmass instead.
 
+## The long way round
+
+Start somewhere and keep going, one border at a time, never repeating a
+country. There is no target; the score is how long a chain you manage. It ends
+when the head has no unused neighbours left, which counts as finishing rather
+than failing — you exhausted it.
+
+Starts are drawn from the same 84 hubs as the neighbours mode, because a
+country with one neighbour is a chain that ends on the first move. The
+autocomplete does not narrow to the head's neighbours, for the same reason it
+does not in the neighbours mode.
+
 ## Hot and cold
 
 One secret country, anywhere on earth. Every guess is coloured by how close it
-is — deep blue far away, through green, to red next door — so the map becomes
-the clue. Islands are perfectly good secrets here, because distance does not
-care about land routes.
+is, and **a guess that borders the answer says so** — in the prompt and against
+that row in the list. Islands are perfectly good secrets here, because distance
+does not care about land routes.
+
+The scale is one hue with varying intensity, the way Globle does it. A
+blue-to-red ramp was tried first and read wrong: on a dark map a cold blue
+guess is barely distinguishable from unguessed land, so far guesses looked like
+they had not registered. Every guess is now visibly red; how red is the clue.
 
 Distance is great-circle between centroids, and the colour falls off
 exponentially with a 3,000 km scale. A linear ramp leaves the whole of Europe
 within one shade of itself; this way a neighbour reads around 0.85, the far side
 of a continent around 0.5, and another continent below 0.1.
 
-| From France | | |
+| From France | | heat |
 | --- | --- | --- |
 | Belgium | 480 km | 0.85 |
 | Poland | 1,370 km | 0.63 |
@@ -239,6 +264,8 @@ cannot permanently brick a room.
   and more one-answer puzzles.
 - **3,000 km** is the hot/cold falloff. Shorter makes the map colder and the
   hunt longer.
+- **Should the chain end when it runs dry?** It counts as a win today, which
+  may be too generous for a two-country cul-de-sac.
 - **Ferries.** All disabled. `src/game/seaLinks.ts` has them grouped and
   commented out; uncommenting `NARROW_STRAITS` alone would put Japan, Sri Lanka
   and the Bering Strait back and reconnect the Americas to Eurasia.

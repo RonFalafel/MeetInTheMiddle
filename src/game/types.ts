@@ -28,4 +28,6 @@ export type Country = {
   readonly continent: ContinentId
   /** Not translated — see capitals.ts for why. */
   readonly capital: string
+  /** Lowercase alpha-2, which is also the flag's filename in `public/flags/`. */
+  readonly flag: string
 }

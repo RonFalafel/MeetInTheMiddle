@@ -13,7 +13,10 @@
     "typecheck": "tsc -b",
     "graph": "node scripts/buildGraph.ts",
     "play": "node scripts/playGame.ts",
-    "sync": "node server/index.ts"
+    "sync": "node server/index.ts",
+    "flags": "node scripts/copyFlags.ts",
+    "prebuild": "node scripts/copyFlags.ts",
+    "predev": "node scripts/copyFlags.ts"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
@@ -31,6 +34,7 @@
     "@types/topojson-client": "^3.1.5",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
+    "flag-icons": "^7.5.0",
     "i18n-iso-countries": "^7.14.0",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",

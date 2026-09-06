@@ -12,7 +12,11 @@ export type LobbyProps = {
   readonly onOpenRoom: (code: string, request?: GameRequest) => void
 }
 
-type Choice = 'menu' | 'continent' | 'identify' | 'capitals'
+type Choice = 'menu' | 'continent' | 'identify' | 'capitals' | 'flags'
+
+/** Which question an identify round asks, from the lobby branch we came down. */
+const promptFor = (choice: Choice): 'shape' | 'capital' | 'flag' =>
+  choice === 'capitals' ? 'capital' : choice === 'flags' ? 'flag' : 'shape'
 
 export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
   const { t } = useLanguage()
@@ -34,7 +38,7 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
     const pick = (id: ContinentId): GameRequest =>
       choice === 'continent'
         ? { mode: 'continent', continent: id }
-        : { mode: 'identify', scope: id, prompt: choice === 'capitals' ? 'capital' : 'shape' }
+        : { mode: 'identify', scope: id, prompt: promptFor(choice) }
 
     return (
       <main className="lobby">
@@ -57,7 +61,7 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
                   onOpenRoom(makeRoomCode(), {
                     mode: 'identify',
                     scope: 'world',
-                    prompt: choice === 'capitals' ? 'capital' : 'shape',
+                    prompt: promptFor(choice),
                   })
                 }
               >
@@ -133,6 +137,26 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
           type="button"
           className="primary"
           onClick={() => onOpenRoom(makeRoomCode(), { mode: 'neighbours' })}
+        >
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeFlags}</h2>
+        <p className="muted">{t.modeFlagsHint}</p>
+        <button type="button" className="primary" onClick={() => setChoice('flags')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeChain}</h2>
+        <p className="muted">{t.modeChainHint}</p>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => onOpenRoom(makeRoomCode(), { mode: 'chain' })}
         >
           {t.startGame}
         </button>

@@ -35,12 +35,13 @@ export type Setup =
     }
   | { readonly mode: 'neighbours'; readonly hub: CountryCode }
   | { readonly mode: 'hot-cold'; readonly target: CountryCode }
+  | { readonly mode: 'chain'; readonly start: CountryCode }
 
 /** Where an identify round draws its countries from. */
 export type Scope = ContinentId | 'world'
 
-/** How an identify round asks about a country: by its shape, or by its capital. */
-export type Prompt = 'shape' | 'capital'
+/** How an identify round asks about a country. */
+export type Prompt = 'shape' | 'capital' | 'flag'
 
 /** A country needs at least this many neighbours to be worth asking about. */
 export const MIN_HUB_NEIGHBOURS = 4
@@ -62,6 +63,7 @@ export type GameRequest =
   | { readonly mode: 'identify'; readonly scope: Scope; readonly prompt: Prompt }
   | { readonly mode: 'neighbours' }
   | { readonly mode: 'hot-cold' }
+  | { readonly mode: 'chain' }
 
 /** Walk toward each other from two secret starts. */
 export type MeetGame = {
@@ -126,7 +128,25 @@ export type HotColdGame = {
   readonly status: 'playing' | 'won' | 'revealed'
 }
 
-export type GameState = MeetGame | ContinentGame | IdentifyGame | NeighboursGame | HotColdGame
+/**
+ * Walk as far as you can, one border at a time, never repeating a country.
+ * There is no target — the score is how long a chain you manage before you run
+ * out of ideas, which makes it the one mode you can play forever.
+ */
+export type ChainGame = {
+  readonly mode: 'chain'
+  readonly start: CountryCode
+  readonly moves: readonly Move[]
+  readonly status: 'playing' | 'won' | 'revealed'
+}
+
+export type GameState =
+  | MeetGame
+  | ContinentGame
+  | IdentifyGame
+  | NeighboursGame
+  | HotColdGame
+  | ChainGame
 
 export type Random = () => number
 
@@ -148,6 +168,7 @@ export function setupOf(state: GameState): Setup {
   if (state.mode === 'continent') return { mode: 'continent', continent: state.continent }
   if (state.mode === 'neighbours') return { mode: 'neighbours', hub: state.hub }
   if (state.mode === 'hot-cold') return { mode: 'hot-cold', target: state.target }
+  if (state.mode === 'chain') return { mode: 'chain', start: state.start }
   return { mode: 'identify', scope: state.scope, prompt: state.prompt, order: state.order }
 }
 
@@ -158,6 +179,7 @@ export function claimedBy(state: GameState): Map<CountryCode, PlayerIndex> {
     claimed.set(state.starts[0], 0)
     claimed.set(state.starts[1], 1)
   }
+  if (state.mode === 'chain') claimed.set(state.start, 0)
 
   if (state.mode === 'identify') {
     // Only the ones actually got right belong on the map; a wrong guess should
@@ -335,9 +357,9 @@ export function randomContinent(random: Random = Math.random): ContinentId {
 }
 
 /** Ends a continent game early so the missed countries can be shown. */
-export function reveal<S extends ContinentGame | IdentifyGame | NeighboursGame | HotColdGame>(
-  state: S,
-): S {
+export function reveal<
+  S extends ContinentGame | IdentifyGame | NeighboursGame | HotColdGame | ChainGame,
+>(state: S): S {
   return state.status === 'playing' ? ({ ...state, status: 'revealed' } as S) : state
 }
 
@@ -495,10 +517,20 @@ export function dealHotCold(random: Random = Math.random): HotColdGame {
   return hotColdGame(CODES[Math.floor(random() * CODES.length)]!)
 }
 
+export type HotColdGuess = {
+  readonly code: CountryCode
+  readonly heat: number
+  readonly km: number
+  /** Shares a land border with the answer, which is worth saying out loud. */
+  readonly borders: boolean
+}
+
 /** Every guess with its heat, hottest first — the running scoreboard. */
-export function hotColdGuesses(state: HotColdGame): { code: CountryCode; heat: number; km: number }[] {
+export function hotColdGuesses(state: HotColdGame): HotColdGuess[] {
+  const neighbours = new Set(getCountry(state.target).neighbours)
   const seen = new Set<CountryCode>()
-  const rows = []
+  const rows: HotColdGuess[] = []
+
   for (const move of state.moves) {
     if (seen.has(move.code)) continue
     seen.add(move.code)
@@ -506,9 +538,46 @@ export function hotColdGuesses(state: HotColdGame): { code: CountryCode; heat: n
       code: move.code,
       heat: heatOf(state, move.code),
       km: Math.round(kilometresBetween(move.code, state.target)),
+      borders: neighbours.has(move.code),
     })
   }
   return rows.sort((a, b) => b.heat - a.heat)
+}
+
+/** The last country guessed, so the screen can react to what just happened. */
+export function lastGuess(state: HotColdGame): HotColdGuess | null {
+  const code = state.moves[state.moves.length - 1]?.code
+  if (!code) return null
+  return hotColdGuesses(state).find((row) => row.code === code) ?? null
+}
+
+// ---------------------------------------------------------------------- chain
+
+export function chainGame(start: CountryCode): ChainGame {
+  return { mode: 'chain', start, moves: [], status: 'playing' }
+}
+
+export function dealChain(random: Random = Math.random): ChainGame {
+  // Starting somewhere with options: a country with one neighbour is a chain
+  // that ends on the first move.
+  const starts = hubCandidates()
+  return chainGame(starts[Math.floor(random() * starts.length)]!)
+}
+
+/** Where the chain currently stands, and therefore what the next country must border. */
+export function chainHead(state: ChainGame): CountryCode {
+  return state.moves[state.moves.length - 1]?.code ?? state.start
+}
+
+/** The whole walk so far, starting country included. */
+export function chainRoute(state: ChainGame): CountryCode[] {
+  return [state.start, ...state.moves.map((move) => move.code)]
+}
+
+/** Neighbours of the head that have not been used yet. Empty means stuck. */
+export function chainOptions(state: ChainGame): CountryCode[] {
+  const used = claimedCodes(state)
+  return getCountry(chainHead(state)).neighbours.filter((code) => !used.has(code))
 }
 
 // ----------------------------------------------------------------------- setup
@@ -518,6 +587,7 @@ export function fromSetup(setup: Setup): GameState {
   if (setup.mode === 'continent') return continentGame(setup.continent)
   if (setup.mode === 'neighbours') return neighboursGame(setup.hub)
   if (setup.mode === 'hot-cold') return hotColdGame(setup.target)
+  if (setup.mode === 'chain') return chainGame(setup.start)
   return identifyGame(setup.scope, setup.prompt, setup.order)
 }
 
@@ -526,6 +596,7 @@ export function deal(request: GameRequest | undefined, options: StartOptions = {
   if (request?.mode === 'continent') return continentGame(request.continent)
   if (request?.mode === 'neighbours') return dealNeighbours(options.random)
   if (request?.mode === 'hot-cold') return dealHotCold(options.random)
+  if (request?.mode === 'chain') return dealChain(options.random)
   if (request?.mode === 'identify') {
     return dealIdentify(request.scope, request.prompt, options.random)
   }
@@ -542,6 +613,7 @@ export function repeatOf(game: GameState): GameRequest {
   // A different country to be asked about, not the same one twice.
   if (game.mode === 'neighbours') return { mode: 'neighbours' }
   if (game.mode === 'hot-cold') return { mode: 'hot-cold' }
+  if (game.mode === 'chain') return { mode: 'chain' }
   return { mode: 'meet' }
 }
 
@@ -585,6 +657,7 @@ export type IllegalReason =
   | 'wrong-landmass'
   | 'wrong-continent'
   | 'not-a-neighbour'
+  | 'not-adjacent'
   | 'already-named'
 
 /**
@@ -616,6 +689,16 @@ export function checkMove(state: GameState, code: CountryCode): MoveCheck {
   if (state.mode === 'identify') {
     // Anything goes: a wrong answer is part of the game rather than a refusal,
     // so it is recorded and costs you, instead of being handed back.
+    return { ok: true, code }
+  }
+
+  if (state.mode === 'chain') {
+    if (claimedCodes(state).has(code)) {
+      return { ok: false, reason: 'already-named', country: code }
+    }
+    if (!getCountry(chainHead(state)).neighbours.includes(code)) {
+      return { ok: false, reason: 'not-adjacent', country: code }
+    }
     return { ok: true, code }
   }
 
@@ -659,6 +742,11 @@ export function namableCodes(state: GameState): ReadonlySet<CountryCode> {
   if (state.mode === 'identify') return new Set(scopeCodes(state.scope))
   // Anywhere on earth is a legitimate guess when you are hunting by distance.
   if (state.mode === 'hot-cold') return new Set(CODES)
+  // Not narrowed to the head's neighbours, for the same reason as the
+  // neighbours mode: that list would be the answer.
+  if (state.mode === 'chain') {
+    return new Set(PLAYABLE_CODES.filter((code) => sameLandmass(code, state.start)))
+  }
   // Neighbours deliberately does not narrow to the answer set: offering only
   // the nine countries that border Germany would be the answer sheet.
   if (state.mode === 'neighbours') {
@@ -706,6 +794,12 @@ export function applyMove<S extends GameState>(state: S, code: CountryCode, play
   if (state.mode === 'hot-cold') {
     const next: HotColdGame = { ...state, moves }
     return { ...next, status: check.code === state.target ? 'won' : 'playing' } as S
+  }
+
+  if (state.mode === 'chain') {
+    const next: ChainGame = { ...state, moves }
+    // Running the head dry is a finish rather than a failure — you exhausted it.
+    return { ...next, status: chainOptions(next).length === 0 ? 'won' : 'playing' } as S
   }
 
   const next: ContinentGame = { ...state, moves }

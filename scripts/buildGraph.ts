@@ -32,6 +32,13 @@ import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
 const url = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
+/**
+ * Flags are keyed by alpha-2, which most countries already have. Kosovo has no
+ * ISO code at all, but flag-icons ships its flag as `xk`, which is the code
+ * everyone uses in practice.
+ */
+const FLAG_OVERRIDES: Readonly<Record<string, string>> = { XKX: 'xk' }
+
 type NeGeometry = { id?: string; properties: { name: string } }
 type NeTopology = { objects: { countries: { geometries: NeGeometry[] } } }
 
@@ -193,6 +200,7 @@ const countries = [...primaryGeometry.entries()]
       component: componentOf.get(code) ?? null,
       continent: continentOf(code)!,
       capital: capitalOf(code)!,
+      flag: FLAG_OVERRIDES[code] ?? iso.alpha3ToAlpha2(code)?.toLowerCase() ?? '',
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
@@ -244,6 +252,9 @@ for (const country of countries) {
   }
   if (!capitalOf(country.code)) {
     fail(`${country.code} (${country.name}) has no capital. Add it to capitals.ts.`)
+  }
+  if (!country.flag) {
+    fail(`${country.code} (${country.name}) has no alpha-2 for its flag. Add a FLAG_OVERRIDE.`)
   }
 }
 for (const code of Object.keys(CAPITALS)) {
@@ -353,6 +364,7 @@ const body = countries
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
       ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
       ` continent: '${c.continent}', capital: ${JSON.stringify(c.capital)},` +
+      ` flag: '${c.flag}',` +
       ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')

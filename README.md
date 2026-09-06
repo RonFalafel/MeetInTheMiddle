@@ -33,6 +33,7 @@ npm run sync
 | `npm run typecheck` | `tsc -b` across app, scripts and server |
 | `npm run build` | typecheck then production bundle |
 | `npm run graph` | regenerate the country graph |
+| `npm run flags` | copy the flags into `public/` (runs before a build) |
 | `npm run play` | play a game in the terminal |
 
 ## The modes
@@ -44,9 +45,12 @@ npm run sync
   round, from one continent or the whole world.
 - **Capital cities** — the same round asked backwards: a capital is shown and
   you name the country.
+- **Flags** — a flag is shown; name the country.
 - **Name the neighbours** — one country is lit up; name everything bordering it.
+- **The long way round** — start somewhere and walk, border by border, as far as
+  you can without repeating yourself.
 - **Hot and cold** — one secret country, and every guess is coloured by how
-  close it is. Globle, on our map.
+  close it is, with bordering guesses called out. Globle, on our map.
 
 Only the first needs a partner. The rest are as good on your own.
 

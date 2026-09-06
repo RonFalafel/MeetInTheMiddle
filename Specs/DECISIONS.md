@@ -170,3 +170,42 @@ the spread that makes the map worth looking at.
 row directly under the guess input, which is exactly where a thumb lands, and
 was being hit by accident. The confirm puts Cancel in the original button's
 position, so a repeated tap cancels rather than confirms.
+
+## 2026-09-06 — flags, chains, and fixing hot/cold
+
+**Hot and cold went to a single hue.** The first version ramped blue through
+green to red, which looked good in isolation and was wrong in play: on a dark
+map a cold blue guess is nearly the same value as unguessed land, so a distant
+guess looked like it had not registered at all. Globle uses one hue and varies
+the intensity, and that is right — every guess should read as *a guess*, with
+how red it is carrying the information.
+
+A related bug went with it: the outline early-return sat above the heat check,
+so with outlines switched off a guessed country was skipped entirely and the
+map stayed blank. Guesses now draw whatever the outline setting says, because
+they are the only feedback this mode gives.
+
+**Bordering the answer is called out explicitly.** It is the strongest clue in
+the mode and it was buried in a distance number. We have exact border data, so
+it costs nothing to say so — in the prompt as the guess lands, and as a badge
+against that row afterwards.
+
+**Flags are static files, not bundled assets.** `scripts/copyFlags.ts` pulls the
+196 we need out of `flag-icons` into `public/flags/` as a prebuild step. 1.3 MB
+of SVG in the JavaScript bundle would be absurd when a round shows ten of them,
+and nginx already serves static files better than we could. `public/flags/` is
+generated and gitignored.
+
+**Flags is a prompt, not a mode** — the same call as capitals. Three prompts
+now share one identify mode: shape, capital, flag.
+
+**The long way round has no target.** Every other mode has a thing to reach or
+complete; this one just runs until you dry up, and the score is the length.
+Running the head out of unused neighbours counts as finishing rather than
+failing, on the grounds that you exhausted it rather than gave up — though a
+two-country cul-de-sac makes that a bit generous, which is noted in SPEC.
+
+**Neither the chain nor the neighbours mode narrows its autocomplete.** Every
+other mode restricts suggestions to what it would accept, which is a kindness.
+In these two the accepted set *is* the answer, so the suggestion list would be
+a cheat sheet. Both offer the whole landmass instead.

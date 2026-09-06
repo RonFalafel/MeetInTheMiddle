@@ -31,6 +31,8 @@ export function describeRejection(
       return format(t.rejectWrongContinent, { country })
     case 'not-a-neighbour':
       return format(t.rejectNotNeighbour, { country })
+    case 'not-adjacent':
+      return format(t.rejectNotAdjacent, { country })
     case 'game-over':
       return t.rejectGameOver
   }

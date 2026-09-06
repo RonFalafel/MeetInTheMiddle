@@ -11,8 +11,11 @@ import {
   continentTargets,
   countriesStillNeeded,
   currentTarget,
+  chainHead,
+  chainRoute,
   hotColdGuesses,
   identifyScore,
+  lastGuess,
   isOver,
   movesMade,
   neighbourRemaining,
@@ -21,6 +24,7 @@ import {
   par,
 } from '../game/rules.ts'
 import type {
+  ChainGame,
   ContinentGame,
   GameRequest,
   GameState,
@@ -33,7 +37,7 @@ import type {
 import type { CountryCode } from '../game/types.ts'
 import { GuessInput } from './GuessInput.tsx'
 import { Lobby } from './Lobby.tsx'
-import { WorldMap } from './WorldMap.tsx'
+import { WorldMap, heatColour } from './WorldMap.tsx'
 import { LanguagePicker } from './LanguagePicker.tsx'
 import { useLanguage } from './language.tsx'
 import { describeError, describeRejection } from './messages.ts'
@@ -123,11 +127,12 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         <Play session={session} game={game} />
       )}
 
-      {game.mode !== 'identify' && game.mode !== 'hot-cold' && (
+      {game.mode !== 'identify' && game.mode !== 'hot-cold' && game.mode !== 'chain' && (
         <Board game={game} me={me} hidePartner={hidePartner} />
       )}
 
       {game.mode === 'hot-cold' && <HotColdBoard game={game} />}
+      {game.mode === 'chain' && <ChainBoard game={game} />}
 
       {!over && game.mode !== 'meet' && game.mode !== 'identify' && session.reveal && (
         <GiveUp onConfirm={session.reveal} />
@@ -161,6 +166,7 @@ function mapFocus(game: GameState, me: PlayerIndex): readonly CountryCode[] {
   if (game.mode === 'neighbours') return [game.hub, ...neighbourTargets(game)]
   // Hot/cold must not open looking at the answer, so it stays on the world.
   if (game.mode === 'hot-cold') return []
+  if (game.mode === 'chain') return [chainHead(game)]
   // Identify follows the country being asked about, which moves each round.
   return [currentTarget(game) ?? game.order[0]!]
 }
@@ -194,6 +200,11 @@ function Header({ game }: { game?: GameState }) {
             <>
               <span>{t.guesses}</span>
               <strong>{movesMade(game)}</strong>
+            </>
+          ) : game.mode === 'chain' ? (
+            <>
+              <span>{t.chainLength}</span>
+              <strong>{chainRoute(game).length}</strong>
             </>
           ) : game.mode === 'neighbours' ? (
             <>
@@ -282,11 +293,13 @@ function Play({ session, game }: { session: Session; game: GameState }) {
           </em>
         </p>
       ) : game.mode === 'hot-cold' ? (
+        <HotColdStanding game={game} />
+      ) : game.mode === 'chain' ? (
         <p className="standing">
-          <strong>{t.hotColdPrompt}</strong>
+          <strong>{format(t.chainPrompt, { country: name(chainHead(game)) })}</strong>
           <em>
             {' · '}
-            {t.guesses}: {movesMade(game)}
+            {t.chainLength}: {chainRoute(game).length}
           </em>
         </p>
       ) : game.mode === 'neighbours' ? (
@@ -298,13 +311,16 @@ function Play({ session, game }: { session: Session; game: GameState }) {
           </em>
         </p>
       ) : (
-        <p className="standing">
-          <strong>{identifyPrompt(game, t)}</strong>
-          <em>
-            {' · '}
-            {identifyScore(game).asked + 1}/{identifyScore(game).total}
-          </em>
-        </p>
+        <>
+          {game.prompt === 'flag' && <FlagPrompt game={game} />}
+          <p className="standing">
+            <strong>{identifyPrompt(game, t)}</strong>
+            <em>
+              {' · '}
+              {identifyScore(game).asked + 1}/{identifyScore(game).total}
+            </em>
+          </p>
+        </>
       )}
 
       <GuessInput game={game} onGuess={guess} disabled={session.connection === 'dropped'} />
@@ -341,6 +357,7 @@ function Play({ session, game }: { session: Session; game: GameState }) {
 /** The question, which depends on how this round asks. */
 function identifyPrompt(game: IdentifyGame, t: Strings): string {
   if (game.prompt === 'shape') return t.whichCountry
+  if (game.prompt === 'flag') return t.whichFlag
   const target = currentTarget(game)
   return format(t.whichCapital, { city: target ? getCountry(target).capital : '' })
 }
@@ -404,6 +421,8 @@ function Summary({ session, game }: { session: Session; game: GameState }) {
         <ContinentSummary game={game} />
       ) : game.mode === 'hot-cold' ? (
         <HotColdSummary game={game} />
+      ) : game.mode === 'chain' ? (
+        <ChainSummary game={game} />
       ) : game.mode === 'neighbours' ? (
         <NeighboursSummary game={game} />
       ) : (
@@ -463,6 +482,73 @@ function ContinentSummary({ game }: { game: ContinentGame }) {
   )
 }
 
+/**
+ * The flag being asked about. Served from `public/flags/` rather than bundled,
+ * and deliberately given no alt text — the file name is the answer.
+ */
+function FlagPrompt({ game }: { game: IdentifyGame }) {
+  const target = currentTarget(game)
+  if (!target) return null
+  return (
+    <div className="flag-prompt">
+      <img src={`/flags/${getCountry(target).flag}.svg`} alt="" width={160} height={120} />
+    </div>
+  )
+}
+
+/** The prompt, plus a call-out when the last guess turned out to be adjacent. */
+function HotColdStanding({ game }: { game: HotColdGame }) {
+  const { t } = useLanguage()
+  const last = lastGuess(game)
+
+  return (
+    <p className="standing">
+      <strong>{t.hotColdPrompt}</strong>
+      <em>
+        {' · '}
+        {t.guesses}: {movesMade(game)}
+      </em>
+      {last?.borders && <span className="borders-flash">{t.bordersIt}</span>}
+    </p>
+  )
+}
+
+function ChainBoard({ game }: { game: ChainGame }) {
+  const { t, name } = useLanguage()
+  const route = chainRoute(game)
+
+  return (
+    <section className="chips">
+      <h3>
+        {t.chainLength}: {route.length}
+      </h3>
+      <ul>
+        {route.map((code, index) => (
+          <li key={code} className={index === route.length - 1 ? 'start' : undefined}>
+            {name(code)}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function ChainSummary({ game }: { game: ChainGame }) {
+  const { t, name } = useLanguage()
+  const route = chainRoute(game)
+
+  return (
+    <>
+      <h2>
+        {t.chainLength}: {route.length}
+      </h2>
+      <p className="route-line">
+        <span>{name(game.start)}</span> {route.slice(1).map(name).join(' → ')}
+      </p>
+    </>
+  )
+}
+
 /** Guesses ranked by warmth, which is the only scoreboard this mode needs. */
 function HotColdBoard({ game }: { game: HotColdGame }) {
   const { t, name } = useLanguage()
@@ -474,19 +560,16 @@ function HotColdBoard({ game }: { game: HotColdGame }) {
       <h3>{t.guesses}</h3>
       <ul>
         {rows.map((row) => (
-          <li key={row.code} style={{ borderColor: heatEdge(row.heat) }}>
-            <span>{name(row.code)}</span>
+          <li key={row.code} style={{ borderInlineStartColor: heatColour(row.heat) }}>
+            <span className="swatch" style={{ background: heatColour(row.heat) }} />
+            <span className="who">{name(row.code)}</span>
+            {row.borders && <b className="borders">{t.bordersIt}</b>}
             <em>{row.km.toLocaleString()} km</em>
           </li>
         ))}
       </ul>
     </section>
   )
-}
-
-function heatEdge(heat: number): string {
-  const clamped = Math.min(1, Math.max(0, heat))
-  return `hsl(${210 - 210 * clamped} ${50 + 35 * clamped}% ${40 + 12 * clamped}%)`
 }
 
 function HotColdSummary({ game }: { game: HotColdGame }) {

@@ -68,12 +68,16 @@ for (const shape of SHAPES) {
 }
 
 /**
- * Cold blue through to hot red. Built here rather than in CSS because the value
- * is continuous — there is no sensible way to write 100 classes for it.
+ * One hue, varying intensity — Globle's scale rather than a rainbow.
+ *
+ * A blue-to-red ramp looked pretty but read wrong: on a dark map a cold blue
+ * guess is barely distinguishable from unguessed land, so far guesses looked
+ * like they had not registered. Every guess is now visibly red; how red is the
+ * clue. Built here rather than in CSS because the value is continuous.
  */
-function heatColour(heat: number): string {
+export function heatColour(heat: number): string {
   const clamped = Math.min(1, Math.max(0, heat))
-  return `hsl(${210 - 210 * clamped} ${50 + 35 * clamped}% ${40 + 12 * clamped}%)`
+  return `hsl(${14 - 14 * clamped} ${45 + 40 * clamped}% ${34 + 22 * clamped}%)`
 }
 
 const projectCentroid = (code: CountryCode): [number, number] | null => {
@@ -197,11 +201,8 @@ export function WorldMap({
             const player = shape.code ? visible.get(shape.code) : undefined
             const isMissed = shape.code !== null && missedSet.has(shape.code)
 
-            // With outlines off, anything not on the board is simply not drawn —
-            // except the country being asked about, which is the whole question.
-            const lit = shape.code !== null && shape.code === highlight
-            if (player === undefined && !isMissed && !lit && !outlines) return null
-
+            // A guess always draws, whatever the outline setting — it is the
+            // only feedback this mode gives.
             const warmth = shape.code !== null ? heat?.get(shape.code) : undefined
             if (warmth !== undefined) {
               return (
@@ -214,6 +215,11 @@ export function WorldMap({
                 />
               )
             }
+
+            // With outlines off, anything not on the board is simply not drawn —
+            // except the country being asked about, which is the whole question.
+            const lit = shape.code !== null && shape.code === highlight
+            if (player === undefined && !isMissed && !lit && !outlines) return null
 
             const className =
               shape.code !== null && shape.code === highlight

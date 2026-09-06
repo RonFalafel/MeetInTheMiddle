@@ -25,3 +25,6 @@ dist-ssr
 
 # Claude Code
 .claude/settings.local.json
+
+# Copied out of flag-icons by scripts/copyFlags.ts
+public/flags
