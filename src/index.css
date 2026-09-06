@@ -814,3 +814,29 @@ button.title:hover {
 .last-answer.wrong strong {
   color: var(--bad);
 }
+
+/*
+ * Trivia answers. One per row rather than a two-column grid: a currency or a
+ * capital can be long, and a wrapped label in a narrow cell is harder to read
+ * quickly than a wide one. Sized for a thumb, like the other tap-through modes.
+ */
+.options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.options button {
+  padding: 0.95rem 0.8rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: start;
+}
+
+.options button:hover {
+  border-color: var(--p0);
+}

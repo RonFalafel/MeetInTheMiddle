@@ -17,6 +17,7 @@ import {
   compareScore,
   currentCountry,
   currentPair,
+  currentQuestion,
   justRevealed,
   previousAnswer,
   hotColdGuesses,
@@ -29,6 +30,7 @@ import {
   neighbourTargets,
   optimalRoute,
   par,
+  triviaScore,
 } from '../game/rules.ts'
 import type {
   ChainGame,
@@ -42,6 +44,8 @@ import type {
   NeighboursGame,
   PlayerIndex,
   RoundScore,
+  TriviaGame,
+  TriviaQuestion,
   WhichContinentGame,
 } from '../game/rules.ts'
 import type { CountryCode } from '../game/types.ts'
@@ -264,6 +268,13 @@ function Header({ game, onLeave }: { game?: GameState; onLeave?: () => void }) {
                 {whichContinentScore(game).right}/{whichContinentScore(game).total}
               </strong>
             </>
+          ) : game.mode === 'trivia' ? (
+            <>
+              <span>{t.correct}</span>
+              <strong>
+                {triviaScore(game).right}/{triviaScore(game).total}
+              </strong>
+            </>
           ) : game.mode === 'neighbours' ? (
             <>
               <span>{t.named}</span>
@@ -341,6 +352,7 @@ function Play({
   if (game.mode === 'which-continent') {
     return <ContinentPlay game={game} onPick={guess} onClue={onClue} />
   }
+  if (game.mode === 'trivia') return <TriviaPlay game={game} onPick={guess} onClue={onClue} />
 
   return (
     <section className="panel">
@@ -522,6 +534,8 @@ function Summary({ session, game }: { session: Session; game: GameState }) {
           score={whichContinentScore(game)}
           describe={(row) => `${name(row.question)} — ${t.continents[row.answer as ContinentId]}`}
         />
+      ) : game.mode === 'trivia' ? (
+        <TriviaSummary game={game} />
       ) : game.mode === 'neighbours' ? (
         <NeighboursSummary game={game} />
       ) : (
@@ -608,7 +622,7 @@ function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: strin
   return (
     <section className="panel">
       <p className="standing">
-        <strong>{t.whichBigger}</strong>
+        <strong>{game.metric === 'population' ? t.whichMorePeople : t.whichBigger}</strong>
         <em>
           {' · '}
           {score.asked + 1}/{score.total}
@@ -669,16 +683,138 @@ function ContinentPlay({
 }
 
 /**
- * What the previous question's answer was. Both tap-through modes move on
+ * What a question asks, in the reader's language.
+ *
+ * The question itself is generated and carries only codes and bare strings —
+ * see `TriviaQuestion` — so this is the only place that turns one into a
+ * sentence, exactly as with every other rejection and prompt in the game.
+ */
+function questionText(
+  question: TriviaQuestion,
+  t: Strings,
+  name: (code: CountryCode) => string,
+): string {
+  const country = name(question.subject)
+  if (question.kind === 'borders') return format(t.triviaBorders, { country })
+  if (question.kind === 'not-borders') return format(t.triviaNotBorders, { country })
+  if (question.kind === 'capital-of') return format(t.triviaCapitalOf, { country })
+  if (question.kind === 'whose-capital') {
+    return format(t.triviaWhoseCapital, { city: getCountry(question.subject).capital })
+  }
+  if (question.kind === 'currency') return format(t.triviaCurrency, { country })
+  if (question.kind === 'language') return format(t.triviaLanguage, { country })
+  return t.triviaLandlocked
+}
+
+/**
+ * One option, labelled. Half the kinds answer with a country, which is
+ * translated; the rest answer with a capital, a currency or a language, which
+ * are not — same reason as capitals.ts.
+ */
+function optionLabel(
+  question: TriviaQuestion,
+  option: string,
+  name: (code: CountryCode) => string,
+): string {
+  const isCountry =
+    question.kind === 'borders' ||
+    question.kind === 'not-borders' ||
+    question.kind === 'whose-capital' ||
+    question.kind === 'landlocked'
+  return isCountry ? name(option) : option
+}
+
+function TriviaPlay({
+  game,
+  onPick,
+  onClue,
+}: {
+  game: TriviaGame
+  onPick: (code: string) => void
+  onClue: (code: CountryCode) => void
+}) {
+  const { t, name } = useLanguage()
+  const score = triviaScore(game)
+  const question = currentQuestion(game)
+  if (!question) return null
+
+  return (
+    <section className="panel">
+      <p className="standing">
+        <strong>{questionText(question, t, name)}</strong>
+        <em>
+          {' · '}
+          {score.asked + 1}/{score.total}
+        </em>
+      </p>
+      <LastAnswer game={game} />
+      <div className="options">
+        {question.options.map((option) => (
+          <button key={option} type="button" onClick={() => onPick(option)}>
+            {optionLabel(question, option, name)}
+          </button>
+        ))}
+      </div>
+      {/* Where the country is the answer, framing it on the map would be the
+          answer, so those two kinds get no clue. */}
+      {question.answer !== question.subject && (
+        <div className="who">
+          <button type="button" className="chip" onClick={() => onClue(question.subject)}>
+            {t.clue}
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function TriviaSummary({ game }: { game: TriviaGame }) {
+  const { t, name } = useLanguage()
+  const score = triviaScore(game)
+  const missed = game.questions.filter((_, index) => {
+    const move = game.moves[index]
+    return move && move.code !== game.questions[index]!.answer
+  })
+
+  return (
+    <>
+      <h2>{score.right === score.total ? t.perfect : t.roundOver}</h2>
+      <p className="verdict">
+        {t.correct}: {score.right}/{score.total}
+      </p>
+      {missed.length > 0 && (
+        <div className="chips missed">
+          <h3>
+            {t.missed}: {missed.length}
+          </h3>
+          <ul>
+            {missed.map((question, index) => (
+              <li key={`${question.kind}-${question.subject}-${index}`}>
+                {questionText(question, t, name)}
+                {' — '}
+                {optionLabel(question, question.answer, name)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * What the previous question's answer was. All three tap-through modes move on
  * whatever you press, so without this a wrong answer teaches nothing.
  */
-function LastAnswer({ game }: { game: CompareGame | WhichContinentGame }) {
+function LastAnswer({ game }: { game: CompareGame | WhichContinentGame | TriviaGame }) {
   const { t, name } = useLanguage()
   const previous = previousAnswer(game)
   if (!previous) return null
 
   const label =
-    game.mode === 'compare' ? name(previous.answer) : t.continents[previous.answer as ContinentId]
+    game.mode === 'compare' ? name(previous.answer)
+    : game.mode === 'which-continent' ? t.continents[previous.answer as ContinentId]
+    : optionLabel(game.questions[game.moves.length - 1]!, previous.answer, name)
 
   return (
     <p className={`last-answer ${previous.right ? 'right' : 'wrong'}`}>

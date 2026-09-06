@@ -148,6 +148,60 @@ Pairs are therefore only offered when the larger is **between 1.2× and 6×** th
 smaller — closer than that and our answer might disagree with a reference book,
 which is worse than a boring question.
 
+## More people
+
+The same round asked about a different column. `CompareGame` carries a
+`metric`, `'area'` or `'population'`, and everything else — the pairing, the
+1.2×–6× band, the map colouring, the scoring — is shared. Two modes in the
+lobby, one implementation.
+
+It is a genuinely different question. Russia is the largest country on earth and
+ninth by population; Bangladesh is the reverse. If the two ever agreed the mode
+would be a duplicate, so there is a test asserting they disagree.
+
+Population lives in [`src/game/population.ts`](../src/game/population.ts),
+hand-written, roughly 2024, rounded to the nearest thousand. Neither
+`world-countries` nor `countries-list` carries the field any more. The figures
+go out of date and that is fine: the game only ever asks which of two countries
+has more people, the pairs are never close, and that ordering moves far more
+slowly than the numbers do. The generator fails the build if a country has no
+entry.
+
+## Trivia
+
+Ten multiple-choice questions, four options each. Nothing is hand-written — the
+graph already knows borders, capitals, currencies, languages and whether a
+country touches the sea, so questions are generated from it and the supply never
+runs out. Seven kinds:
+
+| Kind | Asks | Answers with |
+| --- | --- | --- |
+| `borders` | Which of these borders X? | a country |
+| `not-borders` | Which of these does *not* border X? | a country |
+| `capital-of` | What is the capital of X? | a city |
+| `whose-capital` | X is the capital of which country? | a country |
+| `currency` | What money do they use in X? | a currency |
+| `language` | Which language is spoken in X? | a language |
+| `landlocked` | Which of these has no coast? | a country |
+
+**The distractors are the part that can quietly be wrong**, and a wrong one is
+invisible in play — it just marks a correct answer incorrect. Switzerland has
+four official languages, so a generator that knew only the first would offer
+German as a *wrong* answer about Switzerland. `Country` therefore carries
+`currencies` and `languages` as arrays, and every kind excludes the subject's
+whole list rather than the one value it picked. There is a test per kind
+checking the options back against the graph.
+
+A `TriviaQuestion` carries a kind, a subject and bare strings — country codes
+for the kinds that answer with a country, plain text for the rest. It never
+carries a sentence, so the two phones can be reading different languages; the
+screen builds the question. Capitals, currencies and language names are not
+translated, for the same reason as [capitals](#name-that-country): CLDR has no
+table for them and the English names are what an atlas prints.
+
+Questions are dealt into the `Setup`, not generated per device. Deal them twice
+and the two phones would be answering different questions.
+
 ## Which continent?
 
 A country lights up; tap one of six buttons. No keyboard at all, which makes it
@@ -207,9 +261,10 @@ question:
 | Meet in the middle | Your own start |
 | Fill a continent | The continent (already stated) |
 | Name the neighbours | The hub (already named) |
-| Bigger or smaller | Both countries (both named on the buttons) |
+| Bigger or smaller / More people | Both countries (both named on the buttons) |
 | The long way round | The head of the chain |
 | Name that country | The country — it *is* the question |
+| Trivia | Nothing; the whole world |
 | Capitals, Flags, Which continent?, Hot and cold | Nothing; the whole world |
 
 Framing the answer in the capital and flag rounds was handing them over, which
@@ -226,8 +281,9 @@ Rounds that move on regardless of the answer say what the answer was:
 
 - **Name that country / Capitals / Flags** — **Reveal** gives up on the current
   question and shows what it was, rather than skipping in silence.
-- **Bigger or smaller / Which continent?** — every answer is followed by what
-  the right one was, since a wrong tap otherwise teaches nothing.
+- **Bigger or smaller / More people / Which continent? / Trivia** — every answer
+  is followed by what the right one was, since a wrong tap otherwise teaches
+  nothing.
 
 ## Showing the map
 
@@ -334,8 +390,11 @@ cannot permanently brick a room.
   hunt longer.
 - **Should the chain end when it runs dry?** It counts as a win today, which
   may be too generous for a two-country cul-de-sac.
-- **1.2× to 6×** is the area band for a fair comparison. Narrower makes it
-  harder and riskier; wider makes it obvious.
+- **1.2× to 6×** is the band for a fair comparison, and it is shared by area
+  and population. Narrower makes it harder and riskier; wider makes it obvious.
+- **Four options** in trivia. Three would be too easy; five crowds a phone.
+- **Should trivia let you pick which kinds to ask?** `GameRequest` already
+  carries an optional `kinds`, and the lobby never sets it.
 - **Ferries.** All disabled. `src/game/seaLinks.ts` has them grouped and
   commented out; uncommenting `NARROW_STRAITS` alone would put Japan, Sri Lanka
   and the Bering Strait back and reconnect the Americas to Eurasia.

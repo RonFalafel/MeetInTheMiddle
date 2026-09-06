@@ -32,4 +32,13 @@ export type Country = {
   readonly flag: string
   /** Square kilometres, every polygon of the country included. */
   readonly area: number
+  /** Roughly 2024, rounded. Only the ordering matters — see population.ts. */
+  readonly population: number
+  /**
+   * For trivia. Plural on purpose: Switzerland speaks four languages, so a
+   * question needs the whole list to be sure a wrong option really is wrong.
+   */
+  readonly currencies: readonly string[]
+  readonly languages: readonly string[]
+  readonly landlocked: boolean
 }

@@ -3,7 +3,7 @@ import { makeRoomCode, normaliseRoomCode } from '../../server/protocol.ts'
 import { CONTINENT_IDS } from '../game/continents.ts'
 import type { ContinentId } from '../game/continents.ts'
 import { randomContinent } from '../game/rules.ts'
-import type { GameRequest } from '../game/rules.ts'
+import type { GameRequest, Scope } from '../game/rules.ts'
 import { LanguagePicker } from './LanguagePicker.tsx'
 import { useLanguage } from './language.tsx'
 
@@ -12,7 +12,14 @@ export type LobbyProps = {
   readonly onOpenRoom: (code: string, request?: GameRequest) => void
 }
 
-type Choice = 'menu' | 'continent' | 'identify' | 'capitals' | 'flags' | 'compare'
+type Choice =
+  | 'menu'
+  | 'continent'
+  | 'identify'
+  | 'capitals'
+  | 'flags'
+  | 'compare'
+  | 'population'
 
 /** Which question an identify round asks, from the lobby branch we came down. */
 const promptFor = (choice: Choice): 'shape' | 'capital' | 'flag' =>
@@ -35,12 +42,18 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
   }
 
   if (choice !== 'menu') {
+    // Bigger or smaller and More people are the same round asked about a
+    // different column, so they share everything but the metric.
+    const compareRequest = (scope: Scope): GameRequest => ({
+      mode: 'compare',
+      scope,
+      metric: choice === 'population' ? 'population' : 'area',
+    })
+
     const pick = (id: ContinentId): GameRequest =>
-      choice === 'continent'
-        ? { mode: 'continent', continent: id }
-        : choice === 'compare'
-          ? { mode: 'compare', scope: id }
-          : { mode: 'identify', scope: id, prompt: promptFor(choice) }
+      choice === 'continent' ? { mode: 'continent', continent: id }
+      : choice === 'compare' || choice === 'population' ? compareRequest(id)
+      : { mode: 'identify', scope: id, prompt: promptFor(choice) }
 
     return (
       <main className="lobby">
@@ -62,8 +75,8 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
                 onClick={() =>
                   onOpenRoom(
                     makeRoomCode(),
-                    choice === 'compare'
-                      ? { mode: 'compare', scope: 'world' }
+                    choice === 'compare' || choice === 'population'
+                      ? compareRequest('world')
                       : { mode: 'identify', scope: 'world', prompt: promptFor(choice) },
                   )
                 }
@@ -157,6 +170,26 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
         <h2>{t.modeCompare}</h2>
         <p className="muted">{t.modeCompareHint}</p>
         <button type="button" className="primary" onClick={() => setChoice('compare')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modePopulation}</h2>
+        <p className="muted">{t.modePopulationHint}</p>
+        <button type="button" className="primary" onClick={() => setChoice('population')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeTrivia}</h2>
+        <p className="muted">{t.modeTriviaHint}</p>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => onOpenRoom(makeRoomCode(), { mode: 'trivia' })}
+        >
           {t.startGame}
         </button>
       </section>

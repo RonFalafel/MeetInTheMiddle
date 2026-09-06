@@ -287,3 +287,67 @@ pan-y` and `overscroll-behavior: contain`.
 
 **The title goes home.** It was the only screen with no way back to the mode
 list short of the browser's back button.
+
+## 2026-09-06 — country facts, and what to do with them
+
+**Population is hand-written.** `world-countries` and `countries-list` have both
+dropped the field, and nothing else we depend on carries it. 196 rounded 2024
+figures in `population.ts` is a small table that goes stale slowly: the game only
+ever asks which of two countries has more people, and pairs are only offered at
+1.2× apart or more, so several years of drift cannot make an answer wrong. The
+generator fails the build on a missing entry, so the table cannot rot silently.
+
+**More people is Bigger or smaller with a `metric`.** Not a new mode. The
+pairing, the ratio band, the map colouring, the scoring and the summary are the
+same code; only which column is read changes. Two entries in the lobby, one
+implementation, and `metric` travels in the `Setup` so the two phones cannot end
+up scoring against different columns.
+
+**Trivia questions are generated, never written.** Hand-written questions are a
+content treadmill and would need translating ten ways. The graph already knows
+borders, capitals, currencies, languages and coastlines, so seven kinds of
+question fall out of it and the supply is endless.
+
+**Currencies and languages are arrays, and that is the whole point.** The first
+cut emitted a single `currency` and `language` string. Switzerland's first
+language is French, so a "German" distractor would have been offered as a wrong
+answer about Switzerland — and the bug is invisible in play: it just marks a
+correct answer incorrect. Every kind now excludes the subject's whole list, with
+a test per kind checking the options back against the graph.
+
+**A question carries codes and bare strings, never a sentence.** Same rule as
+rejections: `src/game/` returns structure, `src/ui/` turns it into words,
+because the two players may be reading different languages. Capitals, currencies
+and language names stay untranslated — CLDR has no table for them and the
+English names are what an atlas prints.
+
+**Questions are dealt into the `Setup`.** Generating them per device would have
+the two phones answering different questions while showing the same score.
+
+**`world-countries` is read as JSON, not imported.** Its typings are a default
+export and this project compiles without interop, so `readFileSync` on
+`countries.json` — which is what the generator already does for the world-atlas
+topology — is simpler than fighting the module config.
+
+**Trivia's clue is withheld where the country is the answer.** `whose-capital`
+and `landlocked` both answer with the subject, so framing it on the map would be
+handing the answer over. The other five kinds get the button.
+
+## 2026-09-06 — reborder, and dates of independence: not built
+
+**Freehand border-drawing (reborder.app) is out of proportion.** It needs a
+drawing surface, a way to tell a drawing gesture from the pan and pinch already
+bound to the map, polygon scoring against real geometry, and a fair way to
+compare two drawings. That is a bigger piece of work than every mode here put
+together, and drawing accurately on a phone is unpleasant. **Pin the country**
+is the feasible cousin and a natural duel: tap the map to place a named country,
+scored by great-circle distance from its centroid. It reuses
+`projection.invert()` and the tap-versus-drag discrimination `useZoomPan`
+already has. Not built — offered.
+
+**Independence dates are not in any package we have.** They would be 196
+hand-curated and frequently contested entries (which of the several dates is
+Israel's, Germany's, India's?), and unlike population a wrong one is wrong
+forever rather than merely stale. Disproportionate for one mode. Landlocked,
+currency and language questions cover the same "fun country property" ground and
+come free with the data.

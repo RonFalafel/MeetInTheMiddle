@@ -19,13 +19,20 @@ No router, no state library, no database.
 
 - `src/game/` — pure functions, no React and no Node imports. The graph, the
   rules, the language tables, and the hand-curated data tables (`playSet.ts`,
-  `seaLinks.ts`, `names.ts`, `continents.ts`, `capitals.ts`).
-- `GameState` is a union over eight modes; capitals and flags are `prompt`
-  values on identify, not modes of their own. Two modes (`compare`,
-  `which-continent`) are answered by tapping, so they render buttons instead of
-  `GuessInput` and their `namableCodes` is empty. Anything mode-specific narrows on
+  `seaLinks.ts`, `names.ts`, `continents.ts`, `capitals.ts`, `population.ts`).
+- `GameState` is a union over nine modes; capitals and flags are `prompt`
+  values on identify, and More people is a `metric` on compare — neither is a
+  mode of its own. Three modes (`compare`, `which-continent`, `trivia`) are
+  answered by tapping, so they render buttons instead of `GuessInput` and their
+  `namableCodes` is empty. Anything mode-specific narrows on
   `game.mode` rather than taking optional fields; `applyMove` is generic so a
   caller holding a `MeetGame` still has one afterwards.
+- Trivia questions are generated from the graph and dealt into the `Setup`, so
+  both phones ask the same ones. A `TriviaQuestion` carries codes and bare
+  strings, never a sentence — `src/ui/` builds the wording, like everything
+  else player-facing. When adding a kind, add a test asserting its wrong
+  options really are wrong: a bad distractor is invisible in play, it just
+  marks a correct answer incorrect.
 - `src/game/data/*.generated.ts` — generated. Never edit them; change a curation
   table and run `npm run graph`.
 - `src/ui/` — rendering. `useLocalGame` and `useRoom` both return the same

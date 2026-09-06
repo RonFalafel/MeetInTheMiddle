@@ -16,6 +16,7 @@ import {
   dealCompare,
   dealWhichContinent,
   isOver,
+  metricOf,
   namableCodes,
   repeatOf,
   replay,
@@ -90,13 +91,13 @@ describe('bigger or smaller', () => {
   })
 
   it('accepts only one of the two on offer', () => {
-    const game = compareGame('world', [['FRA', 'RUS']])
+    const game = compareGame('world', 'area', [['FRA', 'RUS']])
     expect(checkMove(game, 'RUS')).toEqual({ ok: true, code: 'RUS' })
     expect(checkMove(game, 'DEU')).toMatchObject({ ok: false, reason: 'not-an-option' })
   })
 
   it('moves on whether you are right or wrong', () => {
-    const game = compareGame('world', [
+    const game = compareGame('world', 'area', [
       ['FRA', 'RUS'],
       ['DEU', 'BRA'],
     ])
@@ -107,7 +108,7 @@ describe('bigger or smaller', () => {
 
   it('scores and finishes', () => {
     const game = answer(
-      compareGame('world', [
+      compareGame('world', 'area', [
         ['FRA', 'RUS'],
         ['DEU', 'BRA'],
       ]),
@@ -120,7 +121,7 @@ describe('bigger or smaller', () => {
   })
 
   it('shows the pair on the map, one in each colour', () => {
-    const game = compareGame('world', [['FRA', 'RUS']])
+    const game = compareGame('world', 'area', [['FRA', 'RUS']])
     expect([...claimedBy(game).entries()]).toEqual([
       ['FRA', 0],
       ['RUS', 1],
@@ -128,18 +129,81 @@ describe('bigger or smaller', () => {
   })
 
   it('offers the autocomplete nothing, because it is answered by tapping', () => {
-    expect(namableCodes(compareGame('world', [['FRA', 'RUS']])).size).toBe(0)
+    expect(namableCodes(compareGame('world', 'area', [['FRA', 'RUS']])).size).toBe(0)
   })
 
   it('survives a round trip through JSON', () => {
-    const original = answer(compareGame('world', [['FRA', 'RUS'], ['DEU', 'BRA']]), ['RUS'])
+    const original = answer(compareGame('world', 'area', [['FRA', 'RUS'], ['DEU', 'BRA']]), ['RUS'])
     const wire = JSON.parse(JSON.stringify({ setup: setupOf(original), moves: original.moves }))
     expect(replay(wire.setup, wire.moves)).toEqual(original)
   })
 
-  it('repeats within the same scope', () => {
-    expect(repeatOf(dealCompare('africa'))).toEqual({ mode: 'compare', scope: 'africa' })
-    expect(deal({ mode: 'compare', scope: 'world' }).mode).toBe('compare')
+  it('repeats within the same scope, asking about the same thing', () => {
+    expect(repeatOf(dealCompare('africa'))).toEqual({
+      mode: 'compare',
+      scope: 'africa',
+      metric: 'area',
+    })
+    expect(repeatOf(dealCompare('africa', 'population'))).toEqual({
+      mode: 'compare',
+      scope: 'africa',
+      metric: 'population',
+    })
+    expect(deal({ mode: 'compare', scope: 'world', metric: 'area' }).mode).toBe('compare')
+  })
+})
+
+describe('more people', () => {
+  it('gives every country a population', () => {
+    for (const code of CODES) expect(getCountry(code).population, code).toBeGreaterThan(0)
+  })
+
+  it('ranks the big ones the way an almanac does', () => {
+    const order = ['IND', 'CHN', 'USA', 'IDN', 'PAK', 'NGA', 'BRA', 'BGD', 'RUS']
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        getCountry(order[i - 1]!).population,
+        `${order[i - 1]} vs ${order[i]}`,
+      ).toBeGreaterThan(getCountry(order[i]!).population)
+    }
+  })
+
+  it('is a different question from area, or it would not be worth adding', () => {
+    // Russia is the largest country and nowhere near the most populous;
+    // Bangladesh is the reverse. If these ever agreed the mode would be a
+    // duplicate of Bigger or smaller.
+    expect(biggerOf(['RUS', 'BGD'], 'area')).toBe('RUS')
+    expect(biggerOf(['RUS', 'BGD'], 'population')).toBe('BGD')
+  })
+
+  it('reads the column it was asked for', () => {
+    expect(metricOf('RUS', 'area')).toBe(getCountry('RUS').area)
+    expect(metricOf('RUS', 'population')).toBe(getCountry('RUS').population)
+  })
+
+  it('deals pairs that are not close to call on population either', () => {
+    for (let i = 0; i < 30; i++) {
+      const game = dealCompare('world', 'population')
+      expect(game.pairs).toHaveLength(ROUND_LENGTH)
+      for (const [a, b] of game.pairs) {
+        const ratio =
+          Math.max(getCountry(a).population, getCountry(b).population) /
+          Math.min(getCountry(a).population, getCountry(b).population)
+        expect(ratio, `${a} vs ${b}`).toBeGreaterThanOrEqual(1.2)
+      }
+    }
+  })
+
+  it('scores against population, not area', () => {
+    const game = applyMove(compareGame('world', 'population', [['RUS', 'BGD']]), 'BGD', 0)
+    expect(compareScore(game)).toMatchObject({ right: 1, total: 1 })
+  })
+
+  it('carries the metric on the wire, or the two phones would disagree', () => {
+    const game = compareGame('world', 'population', [['RUS', 'BGD']])
+    const wire = JSON.parse(JSON.stringify({ setup: setupOf(game), moves: game.moves }))
+    expect(wire.setup.metric).toBe('population')
+    expect(replay(wire.setup, wire.moves)).toEqual(game)
   })
 })
 

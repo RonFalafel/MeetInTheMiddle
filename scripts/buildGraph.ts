@@ -27,6 +27,7 @@ import type { LanguageCode } from '../src/game/languages.ts'
 import { SETTINGS } from '../src/settings.ts'
 import { CONTINENTS, CONTINENT_IDS, continentOf } from '../src/game/continents.ts'
 import { CAPITALS, capitalOf } from '../src/game/capitals.ts'
+import { POPULATION, populationOf } from '../src/game/population.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
@@ -38,6 +39,55 @@ const url = (p: string) => fileURLToPath(new URL(p, import.meta.url))
  * everyone uses in practice.
  */
 const FLAG_OVERRIDES: Readonly<Record<string, string>> = { XKX: 'xk' }
+
+/**
+ * Odds and ends for trivia, from `world-countries` — read as JSON rather than
+ * imported, because its typings are a default export and this project compiles
+ * without interop.
+ *
+ * Plural on purpose. Switzerland has four official languages, so a question
+ * that knew only the first would offer German as a *wrong* answer about
+ * Switzerland. Carrying the whole list is what lets the generator promise a
+ * distractor is really wrong.
+ *
+ * Kosovo is not in that dataset at all, so its row is written out here.
+ */
+type Facts = {
+  currencies: readonly string[]
+  languages: readonly string[]
+  landlocked: boolean
+}
+
+type WorldCountriesRow = {
+  cca3: string
+  currencies?: Record<string, { name?: string }>
+  languages?: Record<string, string>
+  landlocked?: boolean
+}
+
+const worldCountries = JSON.parse(
+  readFileSync(url('../node_modules/world-countries/countries.json'), 'utf8'),
+) as WorldCountriesRow[]
+
+const FACT_OVERRIDES: Readonly<Record<string, Facts>> = {
+  XKX: { currencies: ['Euro'], languages: ['Albanian'], landlocked: true },
+}
+
+const factsFor = (code: CountryCode): Facts => {
+  const override = FACT_OVERRIDES[code]
+  if (override) return override
+
+  const row = worldCountries.find((country) => country.cca3 === code)
+  if (!row) return { currencies: [], languages: [], landlocked: false }
+
+  return {
+    currencies: Object.values(row.currencies ?? {})
+      .map((currency) => currency.name ?? '')
+      .filter(Boolean),
+    languages: Object.values(row.languages ?? {}).filter(Boolean),
+    landlocked: Boolean(row.landlocked),
+  }
+}
 
 type NeGeometry = { id?: string; properties: { name: string } }
 type NeTopology = { objects: { countries: { geometries: NeGeometry[] } } }
@@ -202,6 +252,8 @@ const countries = [...primaryGeometry.entries()]
       capital: capitalOf(code)!,
       flag: FLAG_OVERRIDES[code] ?? iso.alpha3ToAlpha2(code)?.toLowerCase() ?? '',
       area: areaKm2(index),
+      population: populationOf(code) ?? 0,
+      ...factsFor(code),
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
@@ -275,9 +327,15 @@ for (const country of countries) {
   if (!country.flag) {
     fail(`${country.code} (${country.name}) has no alpha-2 for its flag. Add a FLAG_OVERRIDE.`)
   }
+  if (!country.population) {
+    fail(`${country.code} (${country.name}) has no population. Add it to population.ts.`)
+  }
 }
 for (const code of Object.keys(CAPITALS)) {
   if (!byCode.has(code)) fail(`capitals.ts lists ${code}, which is not a country here.`)
+}
+for (const code of Object.keys(POPULATION)) {
+  if (!byCode.has(code)) fail(`population.ts lists ${code}, which is not a country here.`)
 }
 
 for (const country of countries) {
@@ -383,7 +441,9 @@ const body = countries
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
       ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
       ` continent: '${c.continent}', capital: ${JSON.stringify(c.capital)},` +
-      ` flag: '${c.flag}', area: ${c.area},` +
+      ` flag: '${c.flag}', area: ${c.area}, population: ${c.population},` +
+      ` currencies: ${JSON.stringify(c.currencies)}, languages: ${JSON.stringify(c.languages)},` +
+      ` landlocked: ${c.landlocked},` +
       ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')
@@ -481,5 +541,13 @@ for (const id of CONTINENT_IDS) {
       ` ${byLand} of them reachable by land`,
   )
 }
+
+const noCurrency = countries.filter((c) => c.currencies.length === 0).length
+const noLanguage = countries.filter((c) => c.languages.length === 0).length
+console.log(
+  `\n  trivia facts: ${countries.length - noCurrency} with a currency,` +
+    ` ${countries.length - noLanguage} with a language,` +
+    ` ${countries.filter((c) => c.landlocked).length} landlocked`,
+)
 
 console.log('\n  wrote src/game/data/countries.generated.ts\n')

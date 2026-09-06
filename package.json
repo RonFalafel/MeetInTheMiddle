@@ -34,11 +34,13 @@
     "@types/topojson-client": "^3.1.5",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
+    "countries-list": "^3.4.1",
     "flag-icons": "^7.5.0",
     "i18n-iso-countries": "^7.14.0",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "world-countries": "^5.1.0"
   }
 }

@@ -250,6 +250,31 @@ describe('choosing a mode', () => {
     await two.client.close()
   })
 
+  it('carries a trivia round, questions and all, to the second phone', async () => {
+    const one = await join('MDBA', undefined, { mode: 'trivia' })
+    const two = await join('MDBA')
+    const setup = one.welcome.game.setup
+    expect(setup.mode).toBe('trivia')
+    // Deep equality is the point: the questions are generated, so if they were
+    // dealt per device the two phones would be answering different things.
+    expect(two.welcome.game.setup).toEqual(setup)
+    if (setup.mode === 'trivia') {
+      expect(setup.questions.length).toBeGreaterThan(0)
+      for (const question of setup.questions) expect(question.options).toContain(question.answer)
+    }
+    await one.client.close()
+    await two.client.close()
+  })
+
+  it('carries which column Bigger or smaller is asking about', async () => {
+    const one = await join('MDBB', undefined, { mode: 'compare', scope: 'world', metric: 'population' })
+    const two = await join('MDBB')
+    expect(one.welcome.game.setup).toMatchObject({ mode: 'compare', metric: 'population' })
+    expect(two.welcome.game.setup).toEqual(one.welcome.game.setup)
+    await one.client.close()
+    await two.client.close()
+  })
+
   it('lets either player switch the room to another mode', async () => {
     const one = await join('MDAD', undefined, { mode: 'meet' })
     const two = await join('MDAD')

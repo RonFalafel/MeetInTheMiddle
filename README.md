@@ -47,6 +47,11 @@ npm run sync
   you name the country.
 - **Flags** — a flag is shown; name the country.
 - **Bigger or smaller** — two countries, tap the one with more land.
+- **More people** — the same, asked about population. Russia is the biggest
+  country and ninth by population, so it is a genuinely different question.
+- **Trivia** — ten multiple-choice questions, four answers each: borders,
+  capitals, currencies, languages, which one has no coast. Generated from the
+  country graph, so they never run out.
 - **Which continent?** — a country lights up; tap the continent it is on. No
   typing at all, so it is the quickest thing here on a phone.
 - **Name the neighbours** — one country is lit up; name everything bordering it.
@@ -122,7 +127,7 @@ The country graph is generated, never hand-edited. `npm run graph` reads
 land borders from shared arcs in the topology, folds in the hand-written tables
 below, and writes `src/game/data/countries.generated.ts`.
 
-The three files worth editing are all curation, not code:
+The files worth editing are all curation, not code:
 
 - **[`src/game/playSet.ts`](src/game/playSet.ts)** — which countries exist.
   Dependent territories are excluded; contested entities are either played or
@@ -135,6 +140,17 @@ The three files worth editing are all curation, not code:
   group to bring back a region.
 - **[`src/game/names.ts`](src/game/names.ts)** — display names and the
   alternatives a player might type.
+- **[`src/game/continents.ts`](src/game/continents.ts)** and
+  **[`src/game/capitals.ts`](src/game/capitals.ts)** — which continent each
+  country is on, and its capital.
+- **[`src/game/population.ts`](src/game/population.ts)** — roughly 2024,
+  rounded. Hand-written because no package we depend on still carries it. Only
+  the ordering matters, and the generator fails if a country is missing one.
+
+Currencies, languages and whether a country is landlocked come from
+`world-countries` at build time, for trivia. They are plural on purpose:
+Switzerland has four official languages, so a question needs the whole list to
+be sure a wrong option really is wrong.
 
 Without ferries the world is not one connected graph, so the generator works
 out which landmasses can host a game and marks the rest out of play:
