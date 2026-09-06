@@ -201,12 +201,31 @@ const countries = [...primaryGeometry.entries()]
       continent: continentOf(code)!,
       capital: capitalOf(code)!,
       flag: FLAG_OVERRIDES[code] ?? iso.alpha3ToAlpha2(code)?.toLowerCase() ?? '',
+      area: areaKm2(index),
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
 
 function round(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+/**
+ * Total land area in square kilometres, every polygon included.
+ *
+ * Unlike the centroid, this deliberately does not take only the largest piece:
+ * Indonesia and the Philippines are archipelagos and their biggest island is
+ * not their area. Summing does mean France comes out around 640,000 rather than
+ * metropolitan France's 551,000 — which is the official figure once the
+ * overseas departments the dataset draws are counted, so it is right rather
+ * than merely convenient.
+ */
+function areaKm2(index: number): number {
+  const EARTH_RADIUS_KM = 6371
+  const shape = feature(topology as never, geometries[index] as never) as unknown as Feature<
+    Polygon | MultiPolygon
+  >
+  return Math.round(geoArea(shape.geometry) * EARTH_RADIUS_KM ** 2)
 }
 
 /**
@@ -364,7 +383,7 @@ const body = countries
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
       ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
       ` continent: '${c.continent}', capital: ${JSON.stringify(c.capital)},` +
-      ` flag: '${c.flag}',` +
+      ` flag: '${c.flag}', area: ${c.area},` +
       ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')

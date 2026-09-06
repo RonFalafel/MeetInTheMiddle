@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SETTINGS } from '../settings.ts'
 import { getCountry } from '../game/graph.ts'
+import { CONTINENT_IDS } from '../game/continents.ts'
 import { format } from '../game/languages.ts'
 import type { Strings } from '../game/languages.ts'
 import {
@@ -13,9 +14,13 @@ import {
   currentTarget,
   chainHead,
   chainRoute,
+  compareScore,
+  currentCountry,
+  currentPair,
   hotColdGuesses,
   identifyScore,
   lastGuess,
+  whichContinentScore,
   isOver,
   movesMade,
   neighbourRemaining,
@@ -25,6 +30,7 @@ import {
 } from '../game/rules.ts'
 import type {
   ChainGame,
+  CompareGame,
   ContinentGame,
   GameRequest,
   GameState,
@@ -33,8 +39,11 @@ import type {
   MeetGame,
   NeighboursGame,
   PlayerIndex,
+  RoundScore,
+  WhichContinentGame,
 } from '../game/rules.ts'
 import type { CountryCode } from '../game/types.ts'
+import type { ContinentId } from '../game/continents.ts'
 import { GuessInput } from './GuessInput.tsx'
 import { Lobby } from './Lobby.tsx'
 import { WorldMap, heatColour } from './WorldMap.tsx'
@@ -127,16 +136,19 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         <Play session={session} game={game} />
       )}
 
-      {game.mode !== 'identify' && game.mode !== 'hot-cold' && game.mode !== 'chain' && (
+      {(game.mode === 'meet' || game.mode === 'continent' || game.mode === 'neighbours') && (
         <Board game={game} me={me} hidePartner={hidePartner} />
       )}
 
       {game.mode === 'hot-cold' && <HotColdBoard game={game} />}
       {game.mode === 'chain' && <ChainBoard game={game} />}
 
-      {!over && game.mode !== 'meet' && game.mode !== 'identify' && session.reveal && (
-        <GiveUp onConfirm={session.reveal} />
-      )}
+      {!over &&
+        (game.mode === 'continent' || game.mode === 'neighbours' || game.mode === 'chain' ||
+          game.mode === 'hot-cold') &&
+        session.reveal && (
+          <GiveUp onConfirm={session.reveal} />
+        )}
     </main>
   )
 }
@@ -155,6 +167,7 @@ function heatMap(game: HotColdGame): ReadonlyMap<CountryCode, number> {
  */
 function highlightFor(game: GameState, over: boolean): CountryCode | null {
   if (game.mode === 'neighbours') return game.hub
+  if (game.mode === 'which-continent') return over ? null : currentCountry(game)
   if (game.mode === 'identify' && game.prompt === 'shape' && !over) return currentTarget(game)
   return null
 }
@@ -167,6 +180,8 @@ function mapFocus(game: GameState, me: PlayerIndex): readonly CountryCode[] {
   // Hot/cold must not open looking at the answer, so it stays on the world.
   if (game.mode === 'hot-cold') return []
   if (game.mode === 'chain') return [chainHead(game)]
+  if (game.mode === 'compare') return currentPair(game) ?? []
+  if (game.mode === 'which-continent') return [currentCountry(game) ?? game.order[0]!]
   // Identify follows the country being asked about, which moves each round.
   return [currentTarget(game) ?? game.order[0]!]
 }
@@ -205,6 +220,20 @@ function Header({ game }: { game?: GameState }) {
             <>
               <span>{t.chainLength}</span>
               <strong>{chainRoute(game).length}</strong>
+            </>
+          ) : game.mode === 'compare' ? (
+            <>
+              <span>{t.correct}</span>
+              <strong>
+                {compareScore(game).right}/{compareScore(game).total}
+              </strong>
+            </>
+          ) : game.mode === 'which-continent' ? (
+            <>
+              <span>{t.correct}</span>
+              <strong>
+                {whichContinentScore(game).right}/{whichContinentScore(game).total}
+              </strong>
             </>
           ) : game.mode === 'neighbours' ? (
             <>
@@ -270,6 +299,9 @@ function RoomBar({ session, onLeave }: { session: Session; onLeave: () => void }
 function Play({ session, game }: { session: Session; game: GameState }) {
   const { t, name } = useLanguage()
   const { me, setMe, guess, notice } = session
+
+  if (game.mode === 'compare') return <ComparePlay game={game} onPick={guess} />
+  if (game.mode === 'which-continent') return <ContinentPlay game={game} onPick={guess} />
 
   return (
     <section className="panel">
@@ -411,7 +443,7 @@ function describeNotice(
 }
 
 function Summary({ session, game }: { session: Session; game: GameState }) {
-  const { t } = useLanguage()
+  const { t, name } = useLanguage()
 
   return (
     <section className="panel summary">
@@ -423,6 +455,19 @@ function Summary({ session, game }: { session: Session; game: GameState }) {
         <HotColdSummary game={game} />
       ) : game.mode === 'chain' ? (
         <ChainSummary game={game} />
+      ) : game.mode === 'compare' ? (
+        <RoundSummary
+          score={compareScore(game)}
+          describe={(row) => {
+            const [a, b] = row.question.split('/')
+            return `${name(a!)} / ${name(b!)} — ${name(row.answer)}`
+          }}
+        />
+      ) : game.mode === 'which-continent' ? (
+        <RoundSummary
+          score={whichContinentScore(game)}
+          describe={(row) => `${name(row.question)} — ${t.continents[row.answer as ContinentId]}`}
+        />
       ) : game.mode === 'neighbours' ? (
         <NeighboursSummary game={game} />
       ) : (
@@ -496,6 +541,67 @@ function FlagPrompt({ game }: { game: IdentifyGame }) {
   )
 }
 
+/**
+ * Two big buttons rather than the guess input: the answer is one of two things,
+ * and typing a country name you can already see would be busywork.
+ */
+function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: string) => void }) {
+  const { t, name } = useLanguage()
+  const pair = currentPair(game)
+  const score = compareScore(game)
+  if (!pair) return null
+
+  return (
+    <section className="panel">
+      <p className="standing">
+        <strong>{t.whichBigger}</strong>
+        <em>
+          {' · '}
+          {score.asked + 1}/{score.total}
+        </em>
+      </p>
+      <div className="two-up">
+        {pair.map((code, index) => (
+          <button key={code} type="button" className={`big player-${index}`} onClick={() => onPick(code)}>
+            {name(code)}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Six buttons, no keyboard — the quickest thing here on a phone. */
+function ContinentPlay({
+  game,
+  onPick,
+}: {
+  game: WhichContinentGame
+  onPick: (code: string) => void
+}) {
+  const { t } = useLanguage()
+  const score = whichContinentScore(game)
+
+  return (
+    <section className="panel">
+      <p className="standing">
+        <strong>{t.whichContinentIs}</strong>
+        <em>
+          {' · '}
+          {score.asked + 1}/{score.total}
+        </em>
+      </p>
+      <div className="continent-grid">
+        {CONTINENT_IDS.map((id) => (
+          <button key={id} type="button" onClick={() => onPick(id)}>
+            {t.continents[id]}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /** The prompt, plus a call-out when the last guess turned out to be adjacent. */
 function HotColdStanding({ game }: { game: HotColdGame }) {
   const { t } = useLanguage()
@@ -530,6 +636,38 @@ function ChainBoard({ game }: { game: ChainGame }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+/** Right out of total, and what the wrong ones should have been. */
+function RoundSummary({
+  score,
+  describe,
+}: {
+  score: RoundScore
+  describe: (row: RoundScore['wrong'][number]) => string
+}) {
+  const { t } = useLanguage()
+
+  return (
+    <>
+      <h2>{score.right === score.total ? t.perfect : t.roundOver}</h2>
+      <p className="verdict">
+        {t.correct}: {score.right}/{score.total}
+      </p>
+      {score.wrong.length > 0 && (
+        <div className="chips missed">
+          <h3>
+            {t.missed}: {score.wrong.length}
+          </h3>
+          <ul>
+            {score.wrong.map((row) => (
+              <li key={row.question}>{describe(row)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -623,7 +761,7 @@ function IdentifySummary({ game }: { game: IdentifyGame }) {
 
   return (
     <>
-      <h2>{score.right === score.total ? t.perfect : t.filledIt}</h2>
+      <h2>{score.right === score.total ? t.perfect : t.roundOver}</h2>
       <p className="verdict">
         {t.correct}: {score.right}/{score.total}
       </p>

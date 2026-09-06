@@ -46,6 +46,9 @@ npm run sync
 - **Capital cities** — the same round asked backwards: a capital is shown and
   you name the country.
 - **Flags** — a flag is shown; name the country.
+- **Bigger or smaller** — two countries, tap the one with more land.
+- **Which continent?** — a country lights up; tap the continent it is on. No
+  typing at all, so it is the quickest thing here on a phone.
 - **Name the neighbours** — one country is lit up; name everything bordering it.
 - **The long way round** — start somewhere and walk, border by border, as far as
   you can without repeating yourself.

@@ -8,14 +8,18 @@ import {
   sameLandmass,
   shortestPath,
 } from './graph.ts'
-import { CONTINENTS, CONTINENT_IDS, continentOf } from './continents.ts'
+import { CONTINENTS, CONTINENT_IDS, continentOf, isContinentId } from './continents.ts'
 import type { ContinentId } from './continents.ts'
 import type { CountryCode } from './types.ts'
 
 export type PlayerIndex = 0 | 1
 
 export type Move = {
-  readonly code: CountryCode
+  /**
+   * Usually a country. A few modes answer with something else — `SKIP`, or a
+   * continent id in which-continent — which is why this is not narrowed.
+   */
+  readonly code: string
   readonly player: PlayerIndex
 }
 
@@ -36,6 +40,12 @@ export type Setup =
   | { readonly mode: 'neighbours'; readonly hub: CountryCode }
   | { readonly mode: 'hot-cold'; readonly target: CountryCode }
   | { readonly mode: 'chain'; readonly start: CountryCode }
+  | {
+      readonly mode: 'compare'
+      readonly scope: Scope
+      readonly pairs: readonly (readonly [CountryCode, CountryCode])[]
+    }
+  | { readonly mode: 'which-continent'; readonly order: readonly CountryCode[] }
 
 /** Where an identify round draws its countries from. */
 export type Scope = ContinentId | 'world'
@@ -64,6 +74,8 @@ export type GameRequest =
   | { readonly mode: 'neighbours' }
   | { readonly mode: 'hot-cold' }
   | { readonly mode: 'chain' }
+  | { readonly mode: 'compare'; readonly scope: Scope }
+  | { readonly mode: 'which-continent' }
 
 /** Walk toward each other from two secret starts. */
 export type MeetGame = {
@@ -140,6 +152,32 @@ export type ChainGame = {
   readonly status: 'playing' | 'won' | 'revealed'
 }
 
+/**
+ * Two countries, one question: which is bigger? Pairs are dealt up front so
+ * both phones ask the same thing, and every answer moves on — with only two
+ * options there is nothing to gain from letting you try again.
+ */
+export type CompareGame = {
+  readonly mode: 'compare'
+  readonly scope: Scope
+  readonly pairs: readonly (readonly [CountryCode, CountryCode])[]
+  /** `code` is whichever of the pair was chosen. */
+  readonly moves: readonly Move[]
+  readonly status: 'playing' | 'won' | 'revealed'
+}
+
+/**
+ * A country lights up and you tap a continent. No typing at all, which makes
+ * it the quickest thing here on a phone.
+ */
+export type WhichContinentGame = {
+  readonly mode: 'which-continent'
+  readonly order: readonly CountryCode[]
+  /** `code` is a ContinentId rather than a country — see `Move`. */
+  readonly moves: readonly Move[]
+  readonly status: 'playing' | 'won' | 'revealed'
+}
+
 export type GameState =
   | MeetGame
   | ContinentGame
@@ -147,6 +185,8 @@ export type GameState =
   | NeighboursGame
   | HotColdGame
   | ChainGame
+  | CompareGame
+  | WhichContinentGame
 
 export type Random = () => number
 
@@ -169,6 +209,8 @@ export function setupOf(state: GameState): Setup {
   if (state.mode === 'neighbours') return { mode: 'neighbours', hub: state.hub }
   if (state.mode === 'hot-cold') return { mode: 'hot-cold', target: state.target }
   if (state.mode === 'chain') return { mode: 'chain', start: state.start }
+  if (state.mode === 'compare') return { mode: 'compare', scope: state.scope, pairs: state.pairs }
+  if (state.mode === 'which-continent') return { mode: 'which-continent', order: state.order }
   return { mode: 'identify', scope: state.scope, prompt: state.prompt, order: state.order }
 }
 
@@ -180,6 +222,20 @@ export function claimedBy(state: GameState): Map<CountryCode, PlayerIndex> {
     claimed.set(state.starts[1], 1)
   }
   if (state.mode === 'chain') claimed.set(state.start, 0)
+
+  if (state.mode === 'compare') {
+    // Colour the pair to match the two buttons, so the map is the question.
+    const pair = currentPair(state)
+    if (pair) {
+      claimed.set(pair[0], 0)
+      claimed.set(pair[1], 1)
+    }
+    return claimed
+  }
+
+  // Only the country being asked about matters here, and it is highlighted
+  // rather than claimed — a continent id is not something to paint.
+  if (state.mode === 'which-continent') return claimed
 
   if (state.mode === 'identify') {
     // Only the ones actually got right belong on the map; a wrong guess should
@@ -357,9 +413,7 @@ export function randomContinent(random: Random = Math.random): ContinentId {
 }
 
 /** Ends a continent game early so the missed countries can be shown. */
-export function reveal<
-  S extends ContinentGame | IdentifyGame | NeighboursGame | HotColdGame | ChainGame,
->(state: S): S {
+export function reveal<S extends Exclude<GameState, MeetGame>>(state: S): S {
   return state.status === 'playing' ? ({ ...state, status: 'revealed' } as S) : state
 }
 
@@ -580,6 +634,127 @@ export function chainOptions(state: ChainGame): CountryCode[] {
   return getCountry(chainHead(state)).neighbours.filter((code) => !used.has(code))
 }
 
+// -------------------------------------------------------------- bigger or smaller
+
+/**
+ * How far apart two areas must be to make a fair question.
+ *
+ * The 50m outlines are simplified, so an area can be a few per cent off the
+ * official figure. Anything closer than this and our answer might disagree with
+ * an atlas, which would be worse than a boring question.
+ */
+const MIN_AREA_RATIO = 1.2
+const MAX_AREA_RATIO = 6
+
+export function comparePairs(
+  scope: Scope,
+  random: Random = Math.random,
+  rounds = ROUND_LENGTH,
+): [CountryCode, CountryCode][] {
+  const pool = scopeCodes(scope).filter((code) => getCountry(code).area > 0)
+  const pairs: [CountryCode, CountryCode][] = []
+  const used = new Set<string>()
+
+  for (let attempt = 0; attempt < 4000 && pairs.length < rounds; attempt++) {
+    const a = pool[Math.floor(random() * pool.length)]!
+    const b = pool[Math.floor(random() * pool.length)]!
+    if (a === b) continue
+
+    const key = [a, b].sort().join('-')
+    if (used.has(key)) continue
+
+    const ratio = Math.max(getCountry(a).area, getCountry(b).area) /
+      Math.min(getCountry(a).area, getCountry(b).area)
+    if (ratio < MIN_AREA_RATIO || ratio > MAX_AREA_RATIO) continue
+
+    used.add(key)
+    pairs.push([a, b])
+  }
+  return pairs
+}
+
+export function compareGame(
+  scope: Scope,
+  pairs: readonly (readonly [CountryCode, CountryCode])[],
+): CompareGame {
+  return { mode: 'compare', scope, pairs, moves: [], status: 'playing' }
+}
+
+export function dealCompare(scope: Scope = 'world', random: Random = Math.random): CompareGame {
+  return compareGame(scope, comparePairs(scope, random))
+}
+
+/** The pair being asked about, or null once the round is done. */
+export function currentPair(
+  state: CompareGame,
+): readonly [CountryCode, CountryCode] | null {
+  return state.pairs[state.moves.length] ?? null
+}
+
+/** Which of a pair is actually bigger. */
+export function biggerOf(pair: readonly [CountryCode, CountryCode]): CountryCode {
+  return getCountry(pair[0]).area >= getCountry(pair[1]).area ? pair[0] : pair[1]
+}
+
+// ------------------------------------------------------------- which continent
+
+export function whichContinentGame(order: readonly CountryCode[]): WhichContinentGame {
+  return { mode: 'which-continent', order, moves: [], status: 'playing' }
+}
+
+export function dealWhichContinent(random: Random = Math.random): WhichContinentGame {
+  const pool = [...CODES]
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
+  }
+  return whichContinentGame(pool.slice(0, ROUND_LENGTH))
+}
+
+export function currentCountry(state: WhichContinentGame): CountryCode | null {
+  return state.order[state.moves.length] ?? null
+}
+
+// ------------------------------------------------- scoring the tap-through modes
+
+export type RoundScore = {
+  readonly asked: number
+  readonly right: number
+  readonly total: number
+  /** What was got wrong, as [question, given, correct]. */
+  readonly wrong: readonly { question: string; given: string; answer: string }[]
+}
+
+export function compareScore(state: CompareGame): RoundScore {
+  const wrong: { question: string; given: string; answer: string }[] = []
+  let right = 0
+
+  state.moves.forEach((move, index) => {
+    const pair = state.pairs[index]
+    if (!pair) return
+    const answer = biggerOf(pair)
+    if (move.code === answer) right++
+    else wrong.push({ question: `${pair[0]}/${pair[1]}`, given: move.code, answer })
+  })
+
+  return { asked: state.moves.length, right, total: state.pairs.length, wrong }
+}
+
+export function whichContinentScore(state: WhichContinentGame): RoundScore {
+  const wrong: { question: string; given: string; answer: string }[] = []
+  let right = 0
+
+  state.moves.forEach((move, index) => {
+    const code = state.order[index]
+    if (!code) return
+    const answer = continentOf(code)!
+    if (move.code === answer) right++
+    else wrong.push({ question: code, given: move.code, answer })
+  })
+
+  return { asked: state.moves.length, right, total: state.order.length, wrong }
+}
+
 // ----------------------------------------------------------------------- setup
 
 export function fromSetup(setup: Setup): GameState {
@@ -588,6 +763,8 @@ export function fromSetup(setup: Setup): GameState {
   if (setup.mode === 'neighbours') return neighboursGame(setup.hub)
   if (setup.mode === 'hot-cold') return hotColdGame(setup.target)
   if (setup.mode === 'chain') return chainGame(setup.start)
+  if (setup.mode === 'compare') return compareGame(setup.scope, setup.pairs)
+  if (setup.mode === 'which-continent') return whichContinentGame(setup.order)
   return identifyGame(setup.scope, setup.prompt, setup.order)
 }
 
@@ -597,6 +774,8 @@ export function deal(request: GameRequest | undefined, options: StartOptions = {
   if (request?.mode === 'neighbours') return dealNeighbours(options.random)
   if (request?.mode === 'hot-cold') return dealHotCold(options.random)
   if (request?.mode === 'chain') return dealChain(options.random)
+  if (request?.mode === 'compare') return dealCompare(request.scope, options.random)
+  if (request?.mode === 'which-continent') return dealWhichContinent(options.random)
   if (request?.mode === 'identify') {
     return dealIdentify(request.scope, request.prompt, options.random)
   }
@@ -614,6 +793,8 @@ export function repeatOf(game: GameState): GameRequest {
   if (game.mode === 'neighbours') return { mode: 'neighbours' }
   if (game.mode === 'hot-cold') return { mode: 'hot-cold' }
   if (game.mode === 'chain') return { mode: 'chain' }
+  if (game.mode === 'compare') return { mode: 'compare', scope: game.scope }
+  if (game.mode === 'which-continent') return { mode: 'which-continent' }
   return { mode: 'meet' }
 }
 
@@ -658,6 +839,7 @@ export type IllegalReason =
   | 'wrong-continent'
   | 'not-a-neighbour'
   | 'not-adjacent'
+  | 'not-an-option'
   | 'already-named'
 
 /**
@@ -684,7 +866,17 @@ export type MoveCheck = { readonly ok: true; readonly code: CountryCode } | Reje
 export function checkMove(state: GameState, code: CountryCode): MoveCheck {
   if (isOver(state)) return { ok: false, reason: 'game-over' }
   if (code === SKIP && state.mode === 'identify') return { ok: true, code }
+  // which-continent answers with a continent, so the country check comes after.
+  if (state.mode === 'which-continent') {
+    return isContinentId(code) ? { ok: true, code } : { ok: false, reason: 'not-an-option' }
+  }
   if (!exists(code)) return { ok: false, reason: 'unknown-country', text: code }
+
+  if (state.mode === 'compare') {
+    const pair = currentPair(state)
+    if (!pair?.includes(code)) return { ok: false, reason: 'not-an-option' }
+    return { ok: true, code }
+  }
 
   if (state.mode === 'identify') {
     // Anything goes: a wrong answer is part of the game rather than a refusal,
@@ -747,6 +939,8 @@ export function namableCodes(state: GameState): ReadonlySet<CountryCode> {
   if (state.mode === 'chain') {
     return new Set(PLAYABLE_CODES.filter((code) => sameLandmass(code, state.start)))
   }
+  // Answered by tapping, so there is nothing for an autocomplete to offer.
+  if (state.mode === 'compare' || state.mode === 'which-continent') return new Set()
   // Neighbours deliberately does not narrow to the answer set: offering only
   // the nine countries that border Germany would be the answer sheet.
   if (state.mode === 'neighbours') {
@@ -800,6 +994,16 @@ export function applyMove<S extends GameState>(state: S, code: CountryCode, play
     const next: ChainGame = { ...state, moves }
     // Running the head dry is a finish rather than a failure — you exhausted it.
     return { ...next, status: chainOptions(next).length === 0 ? 'won' : 'playing' } as S
+  }
+
+  if (state.mode === 'compare') {
+    const next: CompareGame = { ...state, moves }
+    return { ...next, status: currentPair(next) === null ? 'won' : 'playing' } as S
+  }
+
+  if (state.mode === 'which-continent') {
+    const next: WhichContinentGame = { ...state, moves }
+    return { ...next, status: currentCountry(next) === null ? 'won' : 'playing' } as S
   }
 
   const next: ContinentGame = { ...state, moves }

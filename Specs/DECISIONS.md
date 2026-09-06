@@ -209,3 +209,47 @@ two-country cul-de-sac makes that a bit generous, which is noted in SPEC.
 other mode restricts suggestions to what it would accept, which is a kindness.
 In these two the accepted set *is* the answer, so the suggestion list would be
 a cheat sheet. Both offer the whole landmass instead.
+
+## 2026-09-06 — two modes you answer with your thumb
+
+**Areas are measured, not looked up.** `geoArea` over the country's own polygons
+gives square kilometres for free at build time, so there is no new data table to
+maintain and nothing to go stale. The cost is precision: the 50m outlines are
+simplified and areas land within about 5% of an atlas.
+
+That accuracy sets the game design rather than the other way round. A pair is
+only offered when one country is **1.2× to 6×** the other — below 1.2 our answer
+could genuinely contradict a reference book, which is a worse failure than an
+easy question. There is a test asserting no dealt pair is closer than that.
+
+**Areas sum every polygon rather than taking the largest.** The centroid takes
+the biggest piece, because "where is France" means metropolitan France. Area
+cannot do the same or Indonesia would be measured by one island. Summing makes
+France ~640,000 km², which is its official area including the overseas
+departments the dataset actually draws — right rather than merely convenient.
+
+**Both new modes are answered by tapping.** With two options, or six, letting
+you type a name you can already see would be busywork, and a wrong answer
+should move the round along rather than let you try the other one. So they
+render buttons instead of the guess input, `namableCodes` returns an empty set,
+and there is no give-up because there is nothing to be stuck on.
+
+**A move is no longer always a country.** Which continent? answers with a
+continent id, so `Move.code` widened from `CountryCode` to `string` with a
+comment saying why. `SKIP` had already set that precedent; this makes it
+explicit rather than a quiet special case.
+
+**Bigger or smaller colours the pair to match its buttons.** The two countries
+take the two player colours on the map and the buttons carry the same borders,
+so the map is the question rather than decoration sitting above it.
+
+**A `fill` attribute on an SVG path loses to any CSS rule.** Hot and cold set
+the heat colour with `fill={...}`, which is a presentation attribute, and
+`.land { fill: var(--land) }` beat it — so every guess rendered as plain
+unguessed land and the map never coloured in at all. It is now an inline
+`style`, which does win, and there is a comment on the line saying why.
+
+Worth recording how it survived a check: the verification read the `fill`
+*attribute* back and found it set, which proved nothing about what was drawn.
+Anything about appearance has to be checked with `getComputedStyle` or a
+screenshot, not by reading back the value that was just written.

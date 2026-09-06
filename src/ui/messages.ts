@@ -33,6 +33,8 @@ export function describeRejection(
       return format(t.rejectNotNeighbour, { country })
     case 'not-adjacent':
       return format(t.rejectNotAdjacent, { country })
+    case 'not-an-option':
+      return t.errGeneric
     case 'game-over':
       return t.rejectGameOver
   }

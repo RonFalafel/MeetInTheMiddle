@@ -11,15 +11,22 @@ rules plumbing; only the goal changes.
 | Name that country | Say which country is lit up | Ten rounds are done |
 | Capital cities | Say whose capital that is | Ten rounds are done |
 | Flags | Say whose flag that is | Ten rounds are done |
+| Bigger or smaller | Tap the larger of two countries | Ten rounds are done |
+| Which continent? | Tap the continent a country is on | Ten rounds are done |
 | Name the neighbours | Name everything bordering one country | Nothing is left, or you give up |
 | The long way round | Walk as far as you can, border by border | You run dry, or you give up |
 | Hot and cold | Find one secret country | You name it, or you give up |
 
 Only Meet in the middle needs a partner. The rest are as good alone.
 
-Internally there are six modes, not eight: Capital cities and Flags are both
+Internally there are eight modes, not ten: Capital cities and Flags are both
 `mode: 'identify'` with a different `prompt`, because the machinery is
 identical and only the question changes.
+
+Two of them — Bigger or smaller and Which continent? — are answered by tapping
+rather than typing. They show buttons instead of the guess input, have no
+give-up (there is nothing to get stuck on), and every answer moves the round
+along whether it was right or not.
 
 This describes the game **as it is**, not as it was first imagined. When the
 built game and this file disagree, the game is right and this file is stale —
@@ -123,6 +130,29 @@ gimme — China and Russia have fourteen each.
 The autocomplete deliberately does **not** narrow to the answers. Offering only
 the nine countries that border Germany would be an answer sheet, so it offers
 everything on the same landmass instead.
+
+## Bigger or smaller
+
+Two countries, tap the larger. The pair is coloured on the map to match the two
+buttons, so the map is the question rather than decoration.
+
+Areas come from the geometry itself — `geoArea` over every polygon of the
+country, at build time. Summing rather than taking the largest piece matters:
+Indonesia and the Philippines are archipelagos and their biggest island is not
+their area. It does mean France comes out around 640,000 km² rather than
+metropolitan France's 551,000, which is the official figure once the overseas
+departments the dataset draws are counted.
+
+The 50m outlines are simplified, so an area can be a few per cent off an atlas.
+Pairs are therefore only offered when the larger is **between 1.2× and 6×** the
+smaller — closer than that and our answer might disagree with a reference book,
+which is worse than a boring question.
+
+## Which continent?
+
+A country lights up; tap one of six buttons. No keyboard at all, which makes it
+the fastest thing here on a phone. The answer is a continent id rather than a
+country, which is why `Move.code` is a plain string.
 
 ## The long way round
 
@@ -266,6 +296,8 @@ cannot permanently brick a room.
   hunt longer.
 - **Should the chain end when it runs dry?** It counts as a win today, which
   may be too generous for a two-country cul-de-sac.
+- **1.2× to 6×** is the area band for a fair comparison. Narrower makes it
+  harder and riskier; wider makes it obvious.
 - **Ferries.** All disabled. `src/game/seaLinks.ts` has them grouped and
   commented out; uncommenting `NARROW_STRAITS` alone would put Japan, Sri Lanka
   and the Bering Strait back and reconnect the Americas to Eurasia.

@@ -740,3 +740,32 @@ circle.tiny.highlight {
   /* Flags are the question; a shadow keeps a white one off a dark background. */
   box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
 }
+
+/* -------------------------------------------------------- tap-through modes */
+
+.two-up {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+/* Big enough to hit without looking, which is the point of these two modes. */
+.two-up button.big {
+  padding: 1.1rem 0.6rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+}
+
+/* The border matches the country's colour on the map, so the two line up. */
+.two-up button.big.player-0 {
+  border-color: var(--p0);
+}
+
+.two-up button.big.player-1 {
+  border-color: var(--p1);
+}

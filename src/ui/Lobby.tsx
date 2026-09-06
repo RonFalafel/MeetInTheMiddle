@@ -12,7 +12,7 @@ export type LobbyProps = {
   readonly onOpenRoom: (code: string, request?: GameRequest) => void
 }
 
-type Choice = 'menu' | 'continent' | 'identify' | 'capitals' | 'flags'
+type Choice = 'menu' | 'continent' | 'identify' | 'capitals' | 'flags' | 'compare'
 
 /** Which question an identify round asks, from the lobby branch we came down. */
 const promptFor = (choice: Choice): 'shape' | 'capital' | 'flag' =>
@@ -38,7 +38,9 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
     const pick = (id: ContinentId): GameRequest =>
       choice === 'continent'
         ? { mode: 'continent', continent: id }
-        : { mode: 'identify', scope: id, prompt: promptFor(choice) }
+        : choice === 'compare'
+          ? { mode: 'compare', scope: id }
+          : { mode: 'identify', scope: id, prompt: promptFor(choice) }
 
     return (
       <main className="lobby">
@@ -58,11 +60,12 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
               <button
                 type="button"
                 onClick={() =>
-                  onOpenRoom(makeRoomCode(), {
-                    mode: 'identify',
-                    scope: 'world',
-                    prompt: promptFor(choice),
-                  })
+                  onOpenRoom(
+                    makeRoomCode(),
+                    choice === 'compare'
+                      ? { mode: 'compare', scope: 'world' }
+                      : { mode: 'identify', scope: 'world', prompt: promptFor(choice) },
+                  )
                 }
               >
                 {t.wholeWorld}
@@ -146,6 +149,26 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
         <h2>{t.modeFlags}</h2>
         <p className="muted">{t.modeFlagsHint}</p>
         <button type="button" className="primary" onClick={() => setChoice('flags')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeCompare}</h2>
+        <p className="muted">{t.modeCompareHint}</p>
+        <button type="button" className="primary" onClick={() => setChoice('compare')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeWhichContinent}</h2>
+        <p className="muted">{t.modeWhichContinentHint}</p>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => onOpenRoom(makeRoomCode(), { mode: 'which-continent' })}
+        >
           {t.startGame}
         </button>
       </section>

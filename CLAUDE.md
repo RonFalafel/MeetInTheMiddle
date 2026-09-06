@@ -20,8 +20,10 @@ No router, no state library, no database.
 - `src/game/` — pure functions, no React and no Node imports. The graph, the
   rules, the language tables, and the hand-curated data tables (`playSet.ts`,
   `seaLinks.ts`, `names.ts`, `continents.ts`, `capitals.ts`).
-- `GameState` is a union over six modes; capitals and flags are `prompt` values
-  on identify, not modes of their own. Anything mode-specific narrows on
+- `GameState` is a union over eight modes; capitals and flags are `prompt`
+  values on identify, not modes of their own. Two modes (`compare`,
+  `which-continent`) are answered by tapping, so they render buttons instead of
+  `GuessInput` and their `namableCodes` is empty. Anything mode-specific narrows on
   `game.mode` rather than taking optional fields; `applyMove` is generic so a
   caller holding a `MeetGame` still has one afterwards.
 - `src/game/data/*.generated.ts` — generated. Never edit them; change a curation

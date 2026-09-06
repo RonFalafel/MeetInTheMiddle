@@ -30,4 +30,6 @@ export type Country = {
   readonly capital: string
   /** Lowercase alpha-2, which is also the flag's filename in `public/flags/`. */
   readonly flag: string
+  /** Square kilometres, every polygon of the country included. */
+  readonly area: number
 }

@@ -150,6 +150,13 @@ export type Strings = {
   chainPrompt: string
   chainLength: string
   rejectNotAdjacent: string
+  modeCompare: string
+  modeCompareHint: string
+  whichBigger: string
+  modeWhichContinent: string
+  modeWhichContinentHint: string
+  whichContinentIs: string
+  roundOver: string
   continents: Readonly<Record<ContinentId, string>>
 }
 
@@ -245,6 +252,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Keep going from {country}',
     chainLength: 'Chain',
     rejectNotAdjacent: '{country} does not border it.',
+    modeCompare: 'Bigger or smaller',
+    modeCompareHint: 'Two countries. Tap the one with more land.',
+    whichBigger: 'Which is bigger?',
+    modeWhichContinent: 'Which continent?',
+    modeWhichContinentHint: 'A country lights up. Tap the continent it is on.',
+    whichContinentIs: 'Which continent is this?',
+    roundOver: 'Round over',
     continents: {
       europe: 'Europe',
       asia: 'Asia',
@@ -346,6 +360,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'המשיכו מ{country}',
     chainLength: 'שרשרת',
     rejectNotAdjacent: '{country} לא גובלת בה.',
+    modeCompare: 'גדול או קטן',
+    modeCompareHint: 'שתי מדינות. הקישו על הגדולה מביניהן.',
+    whichBigger: 'איזו גדולה יותר?',
+    modeWhichContinent: 'איזו יבשת?',
+    modeWhichContinentHint: 'מדינה נדלקת. הקישו על היבשת שלה.',
+    whichContinentIs: 'באיזו יבשת זה?',
+    roundOver: 'סוף הסיבוב',
     continents: {
       europe: 'אירופה',
       asia: 'אסיה',
@@ -447,6 +468,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'واصل من {country}',
     chainLength: 'سلسلة',
     rejectNotAdjacent: '{country} لا تحدها.',
+    modeCompare: 'أكبر أم أصغر',
+    modeCompareHint: 'دولتان. اضغط على الأكبر مساحة.',
+    whichBigger: 'أيهما أكبر؟',
+    modeWhichContinent: 'أي قارة؟',
+    modeWhichContinentHint: 'تضيء دولة. اضغط على قارتها.',
+    whichContinentIs: 'في أي قارة تقع؟',
+    roundOver: 'انتهت الجولة',
     continents: {
       europe: 'أوروبا',
       asia: 'آسيا',
@@ -548,6 +576,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Sigue desde {country}',
     chainLength: 'Cadena',
     rejectNotAdjacent: '{country} no limita con él.',
+    modeCompare: 'Más grande o más pequeño',
+    modeCompareHint: 'Dos países. Toca el que tenga más territorio.',
+    whichBigger: '¿Cuál es más grande?',
+    modeWhichContinent: '¿Qué continente?',
+    modeWhichContinentHint: 'Se ilumina un país. Toca su continente.',
+    whichContinentIs: '¿En qué continente está?',
+    roundOver: 'Fin de la ronda',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -649,6 +684,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Continuez depuis {country}',
     chainLength: 'Chaîne',
     rejectNotAdjacent: '{country} ne le borde pas.',
+    modeCompare: 'Plus grand ou plus petit',
+    modeCompareHint: 'Deux pays. Touchez celui qui a le plus de terres.',
+    whichBigger: 'Lequel est le plus grand ?',
+    modeWhichContinent: 'Quel continent ?',
+    modeWhichContinentHint: 'Un pays s’allume. Touchez son continent.',
+    whichContinentIs: 'Sur quel continent est-il ?',
+    roundOver: 'Manche terminée',
     continents: {
       europe: 'Europe',
       asia: 'Asie',
@@ -750,6 +792,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Weiter von {country}',
     chainLength: 'Kette',
     rejectNotAdjacent: '{country} grenzt nicht daran.',
+    modeCompare: 'Größer oder kleiner',
+    modeCompareHint: 'Zwei Länder. Tippe auf das größere.',
+    whichBigger: 'Welches ist größer?',
+    modeWhichContinent: 'Welcher Kontinent?',
+    modeWhichContinentHint: 'Ein Land leuchtet auf. Tippe auf seinen Kontinent.',
+    whichContinentIs: 'Auf welchem Kontinent liegt es?',
+    roundOver: 'Runde vorbei',
     continents: {
       europe: 'Europa',
       asia: 'Asien',
@@ -851,6 +900,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Continua da {country}',
     chainLength: 'Catena',
     rejectNotAdjacent: '{country} non ci confina.',
+    modeCompare: 'Più grande o più piccolo',
+    modeCompareHint: 'Due paesi. Tocca quello più esteso.',
+    whichBigger: 'Quale è più grande?',
+    modeWhichContinent: 'Quale continente?',
+    modeWhichContinentHint: 'Si illumina un paese. Tocca il suo continente.',
+    whichContinentIs: 'In quale continente si trova?',
+    roundOver: 'Turno finito',
     continents: {
       europe: 'Europa',
       asia: 'Asia',
@@ -952,6 +1008,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Ga verder vanaf {country}',
     chainLength: 'Ketting',
     rejectNotAdjacent: '{country} grenst er niet aan.',
+    modeCompare: 'Groter of kleiner',
+    modeCompareHint: 'Twee landen. Tik op het grootste.',
+    whichBigger: 'Welk land is groter?',
+    modeWhichContinent: 'Welk werelddeel?',
+    modeWhichContinentHint: 'Er licht een land op. Tik op het werelddeel.',
+    whichContinentIs: 'In welk werelddeel ligt dit?',
+    roundOver: 'Ronde voorbij',
     continents: {
       europe: 'Europa',
       asia: 'Azië',
@@ -1053,6 +1116,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Continuem a partir de {country}',
     chainLength: 'Cadeia',
     rejectNotAdjacent: '{country} não faz fronteira com ele.',
+    modeCompare: 'Maior ou menor',
+    modeCompareHint: 'Dois países. Toquem no que tem mais território.',
+    whichBigger: 'Qual é maior?',
+    modeWhichContinent: 'Que continente?',
+    modeWhichContinentHint: 'Acende um país. Toquem no continente dele.',
+    whichContinentIs: 'Em que continente fica?',
+    roundOver: 'Fim da ronda',
     continents: {
       europe: 'Europa',
       asia: 'Ásia',
@@ -1154,6 +1224,13 @@ export const STRINGS: Readonly<Record<LanguageCode, Strings>> = {
     chainPrompt: 'Продолжайте от {country}',
     chainLength: 'Цепочка',
     rejectNotAdjacent: '{country} с ней не граничит.',
+    modeCompare: 'Больше или меньше',
+    modeCompareHint: 'Две страны. Нажмите на ту, что больше.',
+    whichBigger: 'Какая больше?',
+    modeWhichContinent: 'Какой материк?',
+    modeWhichContinentHint: 'Загорается страна. Нажмите её материк.',
+    whichContinentIs: 'На каком материке это?',
+    roundOver: 'Раунд окончен',
     continents: {
       europe: 'Европа',
       asia: 'Азия',

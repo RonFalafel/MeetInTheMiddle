@@ -210,7 +210,10 @@ export function WorldMap({
                   key={index}
                   className="land warm"
                   d={shape.d}
-                  fill={heatColour(warmth)}
+                  // A `fill` attribute loses to the `.land` class rule; an
+                  // inline style beats it. Get this wrong and every guess
+                  // silently renders as plain unguessed land.
+                  style={{ fill: heatColour(warmth) }}
                   strokeWidth={crisp(0.4)}
                 />
               )
