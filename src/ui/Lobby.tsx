@@ -12,7 +12,7 @@ export type LobbyProps = {
   readonly onOpenRoom: (code: string, request?: GameRequest) => void
 }
 
-type Choice = 'menu' | 'continent' | 'identify'
+type Choice = 'menu' | 'continent' | 'identify' | 'capitals'
 
 export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
   const { t } = useLanguage()
@@ -34,7 +34,7 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
     const pick = (id: ContinentId): GameRequest =>
       choice === 'continent'
         ? { mode: 'continent', continent: id }
-        : { mode: 'identify', scope: id }
+        : { mode: 'identify', scope: id, prompt: choice === 'capitals' ? 'capital' : 'shape' }
 
     return (
       <main className="lobby">
@@ -50,10 +50,16 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
                 {t.continents[id]}
               </button>
             ))}
-            {choice === 'identify' ? (
+            {choice !== 'continent' ? (
               <button
                 type="button"
-                onClick={() => onOpenRoom(makeRoomCode(), { mode: 'identify', scope: 'world' })}
+                onClick={() =>
+                  onOpenRoom(makeRoomCode(), {
+                    mode: 'identify',
+                    scope: 'world',
+                    prompt: choice === 'capitals' ? 'capital' : 'shape',
+                  })
+                }
               >
                 {t.wholeWorld}
               </button>
@@ -108,6 +114,38 @@ export function Lobby({ onPlayHere, onOpenRoom }: LobbyProps) {
         <h2>{t.modeIdentify}</h2>
         <p className="muted">{t.modeIdentifyHint}</p>
         <button type="button" className="primary" onClick={() => setChoice('identify')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeCapitals}</h2>
+        <p className="muted">{t.modeCapitalsHint}</p>
+        <button type="button" className="primary" onClick={() => setChoice('capitals')}>
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeNeighbours}</h2>
+        <p className="muted">{t.modeNeighboursHint}</p>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => onOpenRoom(makeRoomCode(), { mode: 'neighbours' })}
+        >
+          {t.startGame}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>{t.modeHotCold}</h2>
+        <p className="muted">{t.modeHotColdHint}</p>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => onOpenRoom(makeRoomCode(), { mode: 'hot-cold' })}
+        >
           {t.startGame}
         </button>
       </section>

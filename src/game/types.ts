@@ -26,4 +26,6 @@ export type Country = {
    * Australia and Iceland are perfectly playable there.
    */
   readonly continent: ContinentId
+  /** Not translated — see capitals.ts for why. */
+  readonly capital: string
 }

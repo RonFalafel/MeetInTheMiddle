@@ -27,10 +27,23 @@ export type Move = {
 export type Setup =
   | { readonly mode: 'meet'; readonly starts: readonly [CountryCode, CountryCode] }
   | { readonly mode: 'continent'; readonly continent: ContinentId }
-  | { readonly mode: 'identify'; readonly scope: Scope; readonly order: readonly CountryCode[] }
+  | {
+      readonly mode: 'identify'
+      readonly scope: Scope
+      readonly prompt: Prompt
+      readonly order: readonly CountryCode[]
+    }
+  | { readonly mode: 'neighbours'; readonly hub: CountryCode }
+  | { readonly mode: 'hot-cold'; readonly target: CountryCode }
 
 /** Where an identify round draws its countries from. */
 export type Scope = ContinentId | 'world'
+
+/** How an identify round asks about a country: by its shape, or by its capital. */
+export type Prompt = 'shape' | 'capital'
+
+/** A country needs at least this many neighbours to be worth asking about. */
+export const MIN_HUB_NEIGHBOURS = 4
 
 /** Passed instead of a country to give up on the one currently highlighted. */
 export const SKIP = '--'
@@ -46,7 +59,9 @@ export const ROUND_LENGTH = 10
 export type GameRequest =
   | { readonly mode: 'meet' }
   | { readonly mode: 'continent'; readonly continent: ContinentId }
-  | { readonly mode: 'identify'; readonly scope: Scope }
+  | { readonly mode: 'identify'; readonly scope: Scope; readonly prompt: Prompt }
+  | { readonly mode: 'neighbours' }
+  | { readonly mode: 'hot-cold' }
 
 /** Walk toward each other from two secret starts. */
 export type MeetGame = {
@@ -81,13 +96,37 @@ export type ContinentGame = {
 export type IdentifyGame = {
   readonly mode: 'identify'
   readonly scope: Scope
+  readonly prompt: Prompt
   readonly order: readonly CountryCode[]
   /** Every attempt, right or wrong, plus `SKIP` for a country given up on. */
   readonly moves: readonly Move[]
   readonly status: 'playing' | 'won' | 'revealed'
 }
 
-export type GameState = MeetGame | ContinentGame | IdentifyGame
+/**
+ * Name everything that borders one country. The adjacency graph already knows
+ * the answer, so this mode is almost entirely free — it is the same
+ * "complete this set" shape as a continent game with a different set.
+ */
+export type NeighboursGame = {
+  readonly mode: 'neighbours'
+  readonly hub: CountryCode
+  readonly moves: readonly Move[]
+  readonly status: 'playing' | 'won' | 'revealed'
+}
+
+/**
+ * One secret country. Every guess is coloured by how close it is, so the map
+ * becomes the clue — cold blue far away, red next door.
+ */
+export type HotColdGame = {
+  readonly mode: 'hot-cold'
+  readonly target: CountryCode
+  readonly moves: readonly Move[]
+  readonly status: 'playing' | 'won' | 'revealed'
+}
+
+export type GameState = MeetGame | ContinentGame | IdentifyGame | NeighboursGame | HotColdGame
 
 export type Random = () => number
 
@@ -107,7 +146,9 @@ export function isOver(state: GameState): boolean {
 export function setupOf(state: GameState): Setup {
   if (state.mode === 'meet') return { mode: 'meet', starts: state.starts }
   if (state.mode === 'continent') return { mode: 'continent', continent: state.continent }
-  return { mode: 'identify', scope: state.scope, order: state.order }
+  if (state.mode === 'neighbours') return { mode: 'neighbours', hub: state.hub }
+  if (state.mode === 'hot-cold') return { mode: 'hot-cold', target: state.target }
+  return { mode: 'identify', scope: state.scope, prompt: state.prompt, order: state.order }
 }
 
 /** Every country on the board, and who put it there. Meet includes both starts. */
@@ -294,7 +335,9 @@ export function randomContinent(random: Random = Math.random): ContinentId {
 }
 
 /** Ends a continent game early so the missed countries can be shown. */
-export function reveal<S extends ContinentGame | IdentifyGame>(state: S): S {
+export function reveal<S extends ContinentGame | IdentifyGame | NeighboursGame | HotColdGame>(
+  state: S,
+): S {
   return state.status === 'playing' ? ({ ...state, status: 'revealed' } as S) : state
 }
 
@@ -305,18 +348,26 @@ export function scopeCodes(scope: Scope): readonly CountryCode[] {
   return scope === 'world' ? CODES : CONTINENTS[scope]
 }
 
-export function identifyGame(scope: Scope, order: readonly CountryCode[]): IdentifyGame {
-  return { mode: 'identify', scope, order, moves: [], status: 'playing' }
+export function identifyGame(
+  scope: Scope,
+  prompt: Prompt,
+  order: readonly CountryCode[],
+): IdentifyGame {
+  return { mode: 'identify', scope, prompt, order, moves: [], status: 'playing' }
 }
 
 /** Deals a round: a shuffled sample of the scope, fixed for the whole game. */
-export function dealIdentify(scope: Scope, random: Random = Math.random): IdentifyGame {
+export function dealIdentify(
+  scope: Scope,
+  prompt: Prompt = 'shape',
+  random: Random = Math.random,
+): IdentifyGame {
   const pool = [...scopeCodes(scope)]
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
     ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
   }
-  return identifyGame(scope, pool.slice(0, Math.min(ROUND_LENGTH, pool.length)))
+  return identifyGame(scope, prompt, pool.slice(0, Math.min(ROUND_LENGTH, pool.length)))
 }
 
 /**
@@ -369,18 +420,115 @@ export function identifyScore(state: IdentifyGame): IdentifyScore {
   }
 }
 
+// ------------------------------------------------------------------ neighbours
+
+/** Countries with enough neighbours to make a puzzle rather than a gimme. */
+export function hubCandidates(): readonly CountryCode[] {
+  return PLAYABLE_CODES.filter((code) => getCountry(code).neighbours.length >= MIN_HUB_NEIGHBOURS)
+}
+
+export function neighboursGame(hub: CountryCode): NeighboursGame {
+  return { mode: 'neighbours', hub, moves: [], status: 'playing' }
+}
+
+export function dealNeighbours(random: Random = Math.random): NeighboursGame {
+  const hubs = hubCandidates()
+  return neighboursGame(hubs[Math.floor(random() * hubs.length)]!)
+}
+
+export function neighbourTargets(state: NeighboursGame): readonly CountryCode[] {
+  return getCountry(state.hub).neighbours
+}
+
+export function neighbourRemaining(state: NeighboursGame): CountryCode[] {
+  const claimed = claimedCodes(state)
+  return neighbourTargets(state).filter((code) => !claimed.has(code))
+}
+
+// -------------------------------------------------------------------- hot/cold
+
+/**
+ * Great-circle distance between two countries' centroids, in kilometres.
+ *
+ * Haversine written out rather than pulled from d3-geo, so the game layer stays
+ * free of the map's dependencies and the server does not have to load a
+ * projection library to score a guess.
+ */
+export function kilometresBetween(a: CountryCode, b: CountryCode): number {
+  const EARTH_RADIUS_KM = 6371
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180
+
+  const [aLon, aLat] = getCountry(a).centroid
+  const [bLon, bLat] = getCountry(b).centroid
+
+  const dLat = toRadians(bLat - aLat)
+  const dLon = toRadians(bLon - aLon)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(aLat)) * Math.cos(toRadians(bLat)) * Math.sin(dLon / 2) ** 2
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)))
+}
+
+/**
+ * How fast the colour cools, in kilometres.
+ *
+ * Exponential rather than linear because a linear ramp leaves the whole of
+ * Europe within one shade of itself: at this scale neighbours read around 0.85,
+ * the far side of a continent around 0.5, and another continent below 0.1,
+ * which is the spread that makes the map worth reading.
+ */
+const HEAT_SCALE_KM = 3000
+
+/** 0 for freezing, 1 for the country itself. */
+export function heatOf(state: HotColdGame, code: CountryCode): number {
+  if (code === state.target) return 1
+  return Math.exp(-kilometresBetween(code, state.target) / HEAT_SCALE_KM)
+}
+
+export function hotColdGame(target: CountryCode): HotColdGame {
+  return { mode: 'hot-cold', target, moves: [], status: 'playing' }
+}
+
+export function dealHotCold(random: Random = Math.random): HotColdGame {
+  // Any country at all: islands make perfectly good secrets here, because
+  // distance does not care about land routes.
+  return hotColdGame(CODES[Math.floor(random() * CODES.length)]!)
+}
+
+/** Every guess with its heat, hottest first — the running scoreboard. */
+export function hotColdGuesses(state: HotColdGame): { code: CountryCode; heat: number; km: number }[] {
+  const seen = new Set<CountryCode>()
+  const rows = []
+  for (const move of state.moves) {
+    if (seen.has(move.code)) continue
+    seen.add(move.code)
+    rows.push({
+      code: move.code,
+      heat: heatOf(state, move.code),
+      km: Math.round(kilometresBetween(move.code, state.target)),
+    })
+  }
+  return rows.sort((a, b) => b.heat - a.heat)
+}
+
 // ----------------------------------------------------------------------- setup
 
 export function fromSetup(setup: Setup): GameState {
   if (setup.mode === 'meet') return gameFrom(setup.starts[0], setup.starts[1])
   if (setup.mode === 'continent') return continentGame(setup.continent)
-  return identifyGame(setup.scope, setup.order)
+  if (setup.mode === 'neighbours') return neighboursGame(setup.hub)
+  if (setup.mode === 'hot-cold') return hotColdGame(setup.target)
+  return identifyGame(setup.scope, setup.prompt, setup.order)
 }
 
 /** Deals a game from a request, choosing whatever the request left open. */
 export function deal(request: GameRequest | undefined, options: StartOptions = {}): GameState {
   if (request?.mode === 'continent') return continentGame(request.continent)
-  if (request?.mode === 'identify') return dealIdentify(request.scope, options.random)
+  if (request?.mode === 'neighbours') return dealNeighbours(options.random)
+  if (request?.mode === 'hot-cold') return dealHotCold(options.random)
+  if (request?.mode === 'identify') {
+    return dealIdentify(request.scope, request.prompt, options.random)
+  }
   return newGame(options)
 }
 
@@ -388,7 +536,12 @@ export function deal(request: GameRequest | undefined, options: StartOptions = {
 export function repeatOf(game: GameState): GameRequest {
   if (game.mode === 'continent') return { mode: 'continent', continent: game.continent }
   // A new shuffle of the same scope, not the same ten countries again.
-  if (game.mode === 'identify') return { mode: 'identify', scope: game.scope }
+  if (game.mode === 'identify') {
+    return { mode: 'identify', scope: game.scope, prompt: game.prompt }
+  }
+  // A different country to be asked about, not the same one twice.
+  if (game.mode === 'neighbours') return { mode: 'neighbours' }
+  if (game.mode === 'hot-cold') return { mode: 'hot-cold' }
   return { mode: 'meet' }
 }
 
@@ -431,6 +584,7 @@ export type IllegalReason =
   | 'out-of-play'
   | 'wrong-landmass'
   | 'wrong-continent'
+  | 'not-a-neighbour'
   | 'already-named'
 
 /**
@@ -465,10 +619,23 @@ export function checkMove(state: GameState, code: CountryCode): MoveCheck {
     return { ok: true, code }
   }
 
+  if (state.mode === 'hot-cold') {
+    // Every country is a legal guess — being wrong is how you find the target,
+    // and the colour it comes back is the whole point.
+    if (claimedCodes(state).has(code)) {
+      return { ok: false, reason: 'already-named', country: code }
+    }
+    return { ok: true, code }
+  }
+
   if (state.mode === 'meet') {
     if (!isPlayable(code)) return { ok: false, reason: 'out-of-play', country: code }
     if (!sameLandmass(code, state.starts[0])) {
       return { ok: false, reason: 'wrong-landmass', country: code }
+    }
+  } else if (state.mode === 'neighbours') {
+    if (!neighbourTargets(state).includes(code)) {
+      return { ok: false, reason: 'not-a-neighbour', country: code }
     }
   } else if (continentOf(code) !== state.continent) {
     // Land routes are irrelevant here, so an island is only wrong if it is on
@@ -490,6 +657,13 @@ export function checkMove(state: GameState, code: CountryCode): MoveCheck {
 export function namableCodes(state: GameState): ReadonlySet<CountryCode> {
   if (state.mode === 'continent') return new Set(CONTINENTS[state.continent])
   if (state.mode === 'identify') return new Set(scopeCodes(state.scope))
+  // Anywhere on earth is a legitimate guess when you are hunting by distance.
+  if (state.mode === 'hot-cold') return new Set(CODES)
+  // Neighbours deliberately does not narrow to the answer set: offering only
+  // the nine countries that border Germany would be the answer sheet.
+  if (state.mode === 'neighbours') {
+    return new Set(PLAYABLE_CODES.filter((code) => sameLandmass(code, state.hub)))
+  }
   return new Set(PLAYABLE_CODES.filter((code) => sameLandmass(code, state.starts[0])))
 }
 
@@ -522,6 +696,16 @@ export function applyMove<S extends GameState>(state: S, code: CountryCode, play
   if (state.mode === 'identify') {
     const next: IdentifyGame = { ...state, moves }
     return { ...next, status: currentTarget(next) === null ? 'won' : 'playing' } as S
+  }
+
+  if (state.mode === 'neighbours') {
+    const next: NeighboursGame = { ...state, moves }
+    return { ...next, status: neighbourRemaining(next).length === 0 ? 'won' : 'playing' } as S
+  }
+
+  if (state.mode === 'hot-cold') {
+    const next: HotColdGame = { ...state, moves }
+    return { ...next, status: check.code === state.target ? 'won' : 'playing' } as S
   }
 
   const next: ContinentGame = { ...state, moves }

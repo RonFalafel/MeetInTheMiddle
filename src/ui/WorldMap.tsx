@@ -67,6 +67,15 @@ for (const shape of SHAPES) {
   if (shape.code && !SHAPE_BY_CODE.has(shape.code)) SHAPE_BY_CODE.set(shape.code, shape)
 }
 
+/**
+ * Cold blue through to hot red. Built here rather than in CSS because the value
+ * is continuous — there is no sensible way to write 100 classes for it.
+ */
+function heatColour(heat: number): string {
+  const clamped = Math.min(1, Math.max(0, heat))
+  return `hsl(${210 - 210 * clamped} ${50 + 35 * clamped}% ${40 + 12 * clamped}%)`
+}
+
 const projectCentroid = (code: CountryCode): [number, number] | null => {
   const point = projection(getCountry(code).centroid as [number, number])
   return point ? [point[0], point[1]] : null
@@ -120,6 +129,8 @@ export type WorldMapProps = {
   readonly missed?: readonly CountryCode[]
   /** The country being asked about, drawn lit up and deliberately unnamed. */
   readonly highlight?: CountryCode | null
+  /** Hot/cold: 0 for freezing, 1 for the answer. Colours the guess itself. */
+  readonly heat?: ReadonlyMap<CountryCode, number>
 }
 
 export function WorldMap({
@@ -130,6 +141,7 @@ export function WorldMap({
   focus,
   missed,
   highlight,
+  heat,
 }: WorldMapProps) {
   const { t } = useLanguage()
   const { transform, surfaceProps, reset, centreOn, moved } = useZoomPan(WIDTH, HEIGHT)
@@ -189,6 +201,19 @@ export function WorldMap({
             // except the country being asked about, which is the whole question.
             const lit = shape.code !== null && shape.code === highlight
             if (player === undefined && !isMissed && !lit && !outlines) return null
+
+            const warmth = shape.code !== null ? heat?.get(shape.code) : undefined
+            if (warmth !== undefined) {
+              return (
+                <path
+                  key={index}
+                  className="land warm"
+                  d={shape.d}
+                  fill={heatColour(warmth)}
+                  strokeWidth={crisp(0.4)}
+                />
+              )
+            }
 
             const className =
               shape.code !== null && shape.code === highlight

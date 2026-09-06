@@ -240,7 +240,7 @@ describe('choosing a mode', () => {
   })
 
   it('carries an identify round so both phones ask the same question', async () => {
-    const one = await join('MDAC', undefined, { mode: 'identify', scope: 'europe' })
+    const one = await join('MDAC', undefined, { mode: 'identify', scope: 'europe', prompt: 'shape' })
     const two = await join('MDAC')
     const setup = one.welcome.game.setup
     expect(setup.mode).toBe('identify')

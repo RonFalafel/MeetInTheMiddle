@@ -26,6 +26,7 @@ import { LANGUAGE_CODES } from '../src/game/languages.ts'
 import type { LanguageCode } from '../src/game/languages.ts'
 import { SETTINGS } from '../src/settings.ts'
 import { CONTINENTS, CONTINENT_IDS, continentOf } from '../src/game/continents.ts'
+import { CAPITALS, capitalOf } from '../src/game/capitals.ts'
 import type { CountryCode } from '../src/game/types.ts'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
@@ -191,6 +192,7 @@ const countries = [...primaryGeometry.entries()]
       neighbours: [...edges.get(code)!].sort(),
       component: componentOf.get(code) ?? null,
       continent: continentOf(code)!,
+      capital: capitalOf(code)!,
     }
   })
   .sort((x, y) => x.code.localeCompare(y.code))
@@ -240,6 +242,12 @@ for (const country of countries) {
   if (!placed.has(country.code)) {
     fail(`${country.code} (${country.name}) has no continent. Add it to continents.ts.`)
   }
+  if (!capitalOf(country.code)) {
+    fail(`${country.code} (${country.name}) has no capital. Add it to capitals.ts.`)
+  }
+}
+for (const code of Object.keys(CAPITALS)) {
+  if (!byCode.has(code)) fail(`capitals.ts lists ${code}, which is not a country here.`)
 }
 
 for (const country of countries) {
@@ -344,7 +352,7 @@ const body = countries
     (c) =>
       `  { code: '${c.code}', name: ${JSON.stringify(c.name)}, aliases: ${JSON.stringify(c.aliases)},` +
       ` centroid: [${c.centroid[0]}, ${c.centroid[1]}], component: ${c.component},` +
-      ` continent: '${c.continent}',` +
+      ` continent: '${c.continent}', capital: ${JSON.stringify(c.capital)},` +
       ` neighbours: ${JSON.stringify(c.neighbours)} },`,
   )
   .join('\n')

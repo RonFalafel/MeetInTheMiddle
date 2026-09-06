@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { SETTINGS } from '../settings.ts'
+import { getCountry } from '../game/graph.ts'
 import { format } from '../game/languages.ts'
 import type { Strings } from '../game/languages.ts'
 import {
@@ -10,9 +11,12 @@ import {
   continentTargets,
   countriesStillNeeded,
   currentTarget,
+  hotColdGuesses,
   identifyScore,
   isOver,
   movesMade,
+  neighbourRemaining,
+  neighbourTargets,
   optimalRoute,
   par,
 } from '../game/rules.ts'
@@ -20,8 +24,10 @@ import type {
   ContinentGame,
   GameRequest,
   GameState,
+  HotColdGame,
   IdentifyGame,
   MeetGame,
+  NeighboursGame,
   PlayerIndex,
 } from '../game/rules.ts'
 import type { CountryCode } from '../game/types.ts'
@@ -91,6 +97,7 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
     !over ? undefined
     : game.mode === 'continent' ? continentRemaining(game)
     : game.mode === 'identify' ? identifyScore(game).missed
+    : game.mode === 'neighbours' ? neighbourRemaining(game)
     : undefined
 
   return (
@@ -106,7 +113,8 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         hiddenPlayer={hidePartner ? other : null}
         focus={mapFocus(game, me)}
         missed={missed}
-        highlight={game.mode === 'identify' && !over ? currentTarget(game) : null}
+        highlight={highlightFor(game, over)}
+        heat={game.mode === 'hot-cold' ? heatMap(game) : undefined}
       />
 
       {over ? (
@@ -115,15 +123,44 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         <Play session={session} game={game} />
       )}
 
-      {game.mode !== 'identify' && <Board game={game} me={me} hidePartner={hidePartner} />}
+      {game.mode !== 'identify' && game.mode !== 'hot-cold' && (
+        <Board game={game} me={me} hidePartner={hidePartner} />
+      )}
+
+      {game.mode === 'hot-cold' && <HotColdBoard game={game} />}
+
+      {!over && game.mode !== 'meet' && game.mode !== 'identify' && session.reveal && (
+        <GiveUp onConfirm={session.reveal} />
+      )}
     </main>
   )
+}
+
+/** Every guess so far with its warmth, plus the answer once it is over. */
+function heatMap(game: HotColdGame): ReadonlyMap<CountryCode, number> {
+  const map = new Map<CountryCode, number>()
+  for (const { code, heat } of hotColdGuesses(game)) map.set(code, heat)
+  if (isOver(game)) map.set(game.target, 1)
+  return map
+}
+
+/**
+ * The country drawn lit up. Only the shape prompt hides its identity — the
+ * capitals prompt must not highlight, or the map would answer the question.
+ */
+function highlightFor(game: GameState, over: boolean): CountryCode | null {
+  if (game.mode === 'neighbours') return game.hub
+  if (game.mode === 'identify' && game.prompt === 'shape' && !over) return currentTarget(game)
+  return null
 }
 
 /** What the map should be looking at when it opens. */
 function mapFocus(game: GameState, me: PlayerIndex): readonly CountryCode[] {
   if (game.mode === 'meet') return [game.starts[me]]
   if (game.mode === 'continent') return continentTargets(game)
+  if (game.mode === 'neighbours') return [game.hub, ...neighbourTargets(game)]
+  // Hot/cold must not open looking at the answer, so it stays on the world.
+  if (game.mode === 'hot-cold') return []
   // Identify follows the country being asked about, which moves each round.
   return [currentTarget(game) ?? game.order[0]!]
 }
@@ -151,6 +188,18 @@ function Header({ game }: { game?: GameState }) {
               <span>{t.named}</span>
               <strong>
                 {movesMade(game)}/{continentTargets(game).length}
+              </strong>
+            </>
+          ) : game.mode === 'hot-cold' ? (
+            <>
+              <span>{t.guesses}</span>
+              <strong>{movesMade(game)}</strong>
+            </>
+          ) : game.mode === 'neighbours' ? (
+            <>
+              <span>{t.named}</span>
+              <strong>
+                {movesMade(game)}/{neighbourTargets(game).length}
               </strong>
             </>
           ) : (
@@ -232,9 +281,25 @@ function Play({ session, game }: { session: Session; game: GameState }) {
             {t.stillNeeded}: {continentRemaining(game).length}
           </em>
         </p>
+      ) : game.mode === 'hot-cold' ? (
+        <p className="standing">
+          <strong>{t.hotColdPrompt}</strong>
+          <em>
+            {' · '}
+            {t.guesses}: {movesMade(game)}
+          </em>
+        </p>
+      ) : game.mode === 'neighbours' ? (
+        <p className="standing">
+          <strong>{format(t.whichNeighbours, { country: name(game.hub) })}</strong>
+          <em>
+            {' · '}
+            {t.stillNeeded}: {neighbourRemaining(game).length}
+          </em>
+        </p>
       ) : (
         <p className="standing">
-          <strong>{t.whichCountry}</strong>
+          <strong>{identifyPrompt(game, t)}</strong>
           <em>
             {' · '}
             {identifyScore(game).asked + 1}/{identifyScore(game).total}
@@ -267,14 +332,54 @@ function Play({ session, game }: { session: Session; game: GameState }) {
             {t.skip}
           </button>
         )}
-        {game.mode === 'continent' && session.reveal && (
-          <button type="button" className="chip give-up" onClick={session.reveal}>
-            {t.giveUp}
-          </button>
-        )}
       </div>
       )}
     </section>
+  )
+}
+
+/** The question, which depends on how this round asks. */
+function identifyPrompt(game: IdentifyGame, t: Strings): string {
+  if (game.prompt === 'shape') return t.whichCountry
+  const target = currentTarget(game)
+  return format(t.whichCapital, { city: target ? getCountry(target).capital : '' })
+}
+
+/**
+ * Ending the game early, kept well away from the guess input and needing two
+ * deliberate presses. The confirm deliberately appears to one side, so a second
+ * tap in the same place lands on Cancel rather than confirming.
+ */
+function GiveUp({ onConfirm }: { onConfirm: () => void }) {
+  const { t } = useLanguage()
+  const [asking, setAsking] = useState(false)
+
+  useEffect(() => {
+    if (!asking) return
+    const timer = setTimeout(() => setAsking(false), 6000)
+    return () => clearTimeout(timer)
+  }, [asking])
+
+  if (!asking) {
+    return (
+      <div className="give-up-row">
+        <button type="button" className="quiet" onClick={() => setAsking(true)}>
+          {t.giveUp}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="give-up-row asking">
+      <button type="button" className="quiet" onClick={() => setAsking(false)}>
+        {t.cancel}
+      </button>
+      <span>{t.areYouSure}</span>
+      <button type="button" className="danger" onClick={onConfirm}>
+        {t.giveUp}
+      </button>
+    </div>
   )
 }
 
@@ -297,6 +402,10 @@ function Summary({ session, game }: { session: Session; game: GameState }) {
         <MeetSummary game={game} />
       ) : game.mode === 'continent' ? (
         <ContinentSummary game={game} />
+      ) : game.mode === 'hot-cold' ? (
+        <HotColdSummary game={game} />
+      ) : game.mode === 'neighbours' ? (
+        <NeighboursSummary game={game} />
       ) : (
         <IdentifySummary game={game} />
       )}
@@ -351,6 +460,77 @@ function ContinentSummary({ game }: { game: ContinentGame }) {
         </div>
       )}
     </>
+  )
+}
+
+/** Guesses ranked by warmth, which is the only scoreboard this mode needs. */
+function HotColdBoard({ game }: { game: HotColdGame }) {
+  const { t, name } = useLanguage()
+  const rows = hotColdGuesses(game)
+  if (rows.length === 0) return null
+
+  return (
+    <section className="heat-board">
+      <h3>{t.guesses}</h3>
+      <ul>
+        {rows.map((row) => (
+          <li key={row.code} style={{ borderColor: heatEdge(row.heat) }}>
+            <span>{name(row.code)}</span>
+            <em>{row.km.toLocaleString()} km</em>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function heatEdge(heat: number): string {
+  const clamped = Math.min(1, Math.max(0, heat))
+  return `hsl(${210 - 210 * clamped} ${50 + 35 * clamped}% ${40 + 12 * clamped}%)`
+}
+
+function HotColdSummary({ game }: { game: HotColdGame }) {
+  const { t, name } = useLanguage()
+
+  return (
+    <>
+      <h2>{game.status === 'won' ? t.foundIt : t.gaveUp}</h2>
+      <p className="verdict">
+        {t.theAnswer}: <strong>{name(game.target)}</strong> · {t.guesses}: {movesMade(game)}
+      </p>
+    </>
+  )
+}
+
+function NeighboursSummary({ game }: { game: NeighboursGame }) {
+  const { t, name } = useLanguage()
+  const missed = neighbourRemaining(game)
+  const total = neighbourTargets(game).length
+
+  return (
+    <>
+      <h2>{game.status === 'won' ? t.perfect : t.gaveUp}</h2>
+      <p className="verdict">
+        {name(game.hub)} · {t.named}: {movesMade(game)}/{total}
+      </p>
+      {missed.length > 0 && <Missed codes={missed} />}
+    </>
+  )
+}
+
+function Missed({ codes }: { codes: readonly CountryCode[] }) {
+  const { t, name } = useLanguage()
+  return (
+    <div className="chips missed">
+      <h3>
+        {t.missed}: {codes.length}
+      </h3>
+      <ul>
+        {codes.map((code) => (
+          <li key={code}>{name(code)}</li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

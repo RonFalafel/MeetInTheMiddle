@@ -19,10 +19,11 @@ No router, no state library, no database.
 
 - `src/game/` — pure functions, no React and no Node imports. The graph, the
   rules, the language tables, and the hand-curated data tables (`playSet.ts`,
-  `seaLinks.ts`, `names.ts`, `continents.ts`).
-- `GameState` is a union over three modes. Anything mode-specific narrows on
-  `game.mode` rather than taking optional fields; `applyMove` is generic so a
-  caller holding a `MeetGame` still has one afterwards.
+  `seaLinks.ts`, `names.ts`, `continents.ts`, `capitals.ts`).
+- `GameState` is a union over five modes (capitals is a `prompt` on identify,
+  not a mode of its own). Anything mode-specific narrows on `game.mode` rather
+  than taking optional fields; `applyMove` is generic so a caller holding a
+  `MeetGame` still has one afterwards.
 - `src/game/data/*.generated.ts` — generated. Never edit them; change a curation
   table and run `npm run graph`.
 - `src/ui/` — rendering. `useLocalGame` and `useRoom` both return the same
@@ -71,3 +72,7 @@ testable without a browser — see `server/serve.test.ts`.
 - A `GameRequest` is what the lobby asks for; a `Setup` is what was dealt and is
   what travels on the wire. Do not merge them — a request may leave the start
   pair open, a setup never may, or a reconnecting phone rejoins a different game.
+  `Snapshot` adds `revealed`, which no move list implies.
+- Adding a mode: a variant on `Setup`, `GameRequest` and `GameState`, then
+  follow the compiler. It will find every branch that needs one, which is the
+  point of the union.

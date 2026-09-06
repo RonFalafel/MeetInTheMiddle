@@ -26,7 +26,7 @@ import type { IdentifyGame } from './rules.ts'
 const aceIt = (game: IdentifyGame): IdentifyGame =>
   game.order.reduce((state, code, index) => applyMove(state, code, (index % 2) as 0 | 1), game)
 
-const round = (order: string[]) => identifyGame('europe', order)
+const round = (order: string[]) => identifyGame('europe', 'shape', order)
 
 describe('dealing a round', () => {
   it('draws from the chosen scope and stops at the round length', () => {
@@ -54,12 +54,12 @@ describe('dealing a round', () => {
   })
 
   it('is dealt through the same request path as the other modes', () => {
-    const game = deal({ mode: 'identify', scope: 'africa' })
+    const game = deal({ mode: 'identify', scope: 'africa', prompt: 'shape' })
     expect(game.mode).toBe('identify')
   })
 
   it('reshuffles rather than repeating the same ten', () => {
-    expect(repeatOf(dealIdentify('asia'))).toEqual({ mode: 'identify', scope: 'asia' })
+    expect(repeatOf(dealIdentify('asia'))).toEqual({ mode: 'identify', scope: 'asia', prompt: 'shape' })
   })
 })
 
@@ -148,7 +148,7 @@ describe('what the board shows', () => {
 describe('on the wire', () => {
   it('carries the order, so both phones ask the same question', () => {
     const game = dealIdentify('europe')
-    expect(setupOf(game)).toEqual({ mode: 'identify', scope: 'europe', order: game.order })
+    expect(setupOf(game)).toEqual({ mode: 'identify', scope: 'europe', prompt: 'shape', order: game.order })
   })
 
   it('survives a round trip through JSON, wrong answers and all', () => {

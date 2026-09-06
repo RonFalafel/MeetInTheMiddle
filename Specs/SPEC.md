@@ -9,9 +9,15 @@ rules plumbing; only the goal changes.
 | Meet in the middle | Join two secret starts | The named countries connect them |
 | Fill a continent | Name every country in one continent | Nothing is left, or you give up |
 | Name that country | Say which country is lit up | Ten rounds are done |
+| Capital cities | Say whose capital that is | Ten rounds are done |
+| Name the neighbours | Name everything bordering one country | Nothing is left, or you give up |
+| Hot and cold | Find one secret country | You name it, or you give up |
 
-Continent and Name-that-country work just as well alone as with two people —
-there is nothing about them that needs a partner.
+Only Meet in the middle needs a partner. The rest are as good alone.
+
+Internally there are five modes, not six: Capital cities is
+`mode: 'identify'` with `prompt: 'capital'`, because the machinery is identical
+and only the question changes.
 
 This describes the game **as it is**, not as it was first imagined. When the
 built game and this file disagree, the game is right and this file is stale —
@@ -90,9 +96,45 @@ where being wrong costs something, because otherwise you could name every
 country in Europe until one stuck. The prompt stays put until you get it or
 skip, and a skip marks that country missed and moves on.
 
+**Capital cities** is the same round asked the other way: a capital is shown and
+you name the country. Capitals are not translated — CLDR gives country names in
+every language but there is no equivalent for cities in the browser, so the
+prompt stays Latin even when the game is in Hebrew. The answer is a country
+name, which is translated.
+
 This mode is where the outline toggle earns its keep: with outlines off, the
 lit country is the only thing drawn, so you are identifying a shape with no
 surrounding context at all.
+
+## Name the neighbours
+
+One country is lit up; name everything that borders it. Hubs are drawn from the
+84 countries with at least four neighbours, so it is a puzzle rather than a
+gimme — China and Russia have fourteen each.
+
+The autocomplete deliberately does **not** narrow to the answers. Offering only
+the nine countries that border Germany would be an answer sheet, so it offers
+everything on the same landmass instead.
+
+## Hot and cold
+
+One secret country, anywhere on earth. Every guess is coloured by how close it
+is — deep blue far away, through green, to red next door — so the map becomes
+the clue. Islands are perfectly good secrets here, because distance does not
+care about land routes.
+
+Distance is great-circle between centroids, and the colour falls off
+exponentially with a 3,000 km scale. A linear ramp leaves the whole of Europe
+within one shade of itself; this way a neighbour reads around 0.85, the far side
+of a continent around 0.5, and another continent below 0.1.
+
+| From France | | |
+| --- | --- | --- |
+| Belgium | 480 km | 0.85 |
+| Poland | 1,370 km | 0.63 |
+| Egypt | 3,286 km | 0.33 |
+| United States | 7,644 km | 0.08 |
+| Australia | 15,192 km | 0.01 |
 
 ## Showing the map
 
@@ -159,6 +201,16 @@ A `Setup` describes a specific game and always names what was dealt; a
 `GameRequest` is what someone asks for and leaves the dealing open. The lobby
 sends a request; the wire carries a setup.
 
+A `Snapshot` is a setup, the moves, and `revealed` — the one piece of state no
+move list implies. Leaving it out meant one player could give up and the other
+never find out.
+
+## Ending a game early
+
+Giving up sits at the bottom of the page, well away from the guess input, and
+takes two presses. The confirm puts **Cancel** where the original button was, so
+a second tap in the same place cancels rather than confirms.
+
 ## Two devices
 
 A four-character room code, carried in the URL so it can be shared as a link.
@@ -183,6 +235,10 @@ cannot permanently brick a room.
   pressure is patience.
 - **Ten per round** in Name that country. Longer is more of a test, shorter is
   more of a warm-up.
+- **Four neighbours** is the bar for a hub. Lower would let in more countries
+  and more one-answer puzzles.
+- **3,000 km** is the hot/cold falloff. Shorter makes the map colder and the
+  hunt longer.
 - **Ferries.** All disabled. `src/game/seaLinks.ts` has them grouped and
   commented out; uncommenting `NARROW_STRAITS` alone would put Japan, Sri Lanka
   and the Bering Strait back and reconnect the Americas to Eurasia.

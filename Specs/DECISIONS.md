@@ -132,3 +132,41 @@ send an incomplete setup, so they were split: request in, setup out.
 **Identify carries its shuffled order in the setup.** Deriving it from a seed
 would work, but the order is only ten codes and putting it in the setup means
 replay is exact and both phones ask the same question with no shared RNG.
+
+## 2026-09-06 — three more modes
+
+**Capitals is a prompt, not a mode.** Asking "whose capital is Oslo?" and
+"which country is this shape?" share every piece of machinery — the same
+shuffled round, the same scoring, the same skip. It is `prompt: 'capital'` on
+the identify mode rather than a fourth game, and the map deliberately stops
+highlighting, because the highlight would answer the question.
+
+**Capitals are not translated, and that is a deliberate stop.** CLDR gives
+country names in every language through `Intl.DisplayNames`, but there is no
+equivalent for cities, and hand-writing 196 of them in ten languages is not
+worth it. A capital is a proper noun that mostly transliterates. The answer is
+still a country name, which is fully translated.
+
+**The neighbours autocomplete does not narrow to the answers.** Every other
+mode restricts suggestions to what it would accept, which is a kindness. Here
+it would be a cheat sheet — nine suggestions for Germany and the game is over —
+so it offers the whole landmass instead.
+
+**Hot and cold measures kilometres, not border hops.** Hops are the natural
+metric for this codebase and the wrong one here: they are coarse, and islands
+have none at all. Great-circle distance between centroids works for every
+country on earth and gives a smooth gradient, which is the entire mechanic.
+
+Haversine is written out in `rules.ts` rather than imported from `d3-geo`, so
+the game layer stays free of the map's dependencies and the server does not
+load a projection library to score a guess.
+
+**The heat curve is exponential, not linear.** A linear ramp put the whole of
+Europe inside one shade. At a 3,000 km scale a neighbour reads about 0.85, the
+far side of a continent about 0.5, and another continent below 0.1 — which is
+the spread that makes the map worth looking at.
+
+**Giving up moved to the bottom of the page and grew a confirm.** It sat in the
+row directly under the guess input, which is exactly where a thumb lands, and
+was being hit by accident. The confirm puts Cancel in the original button's
+position, so a repeated tap cancels rather than confirms.
