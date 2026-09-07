@@ -261,19 +261,38 @@ question:
 | Meet in the middle | Your own start |
 | Fill a continent | The continent (already stated) |
 | Name the neighbours | The hub (already named) |
-| Bigger or smaller / More people | Both countries (both named on the buttons) |
+| Bigger or smaller / More people | Nothing; the whole world |
 | The long way round | The head of the chain |
 | Name that country | The country — it *is* the question |
 | Trivia | Nothing; the whole world |
 | Capitals, Flags, Which continent?, Hot and cold | Nothing; the whole world |
 
 Framing the answer in the capital and flag rounds was handing them over, which
-is why those four stay put.
+is why those stay put.
 
-**Clue** is the deliberate version of that. Pressing it zooms the map to 3× and
-puts the country in frame but **off centre** — dead centre would be as good as
-naming it. The offset is derived from the country code, so asking twice moves
-the map to the same place rather than jittering.
+**Drawing the country is the same trap**, and it took longer to spot. Which
+continent? used to light the country up, which shows you where it is — the whole
+question. Bigger or smaller used to draw both countries in the buttons' colours,
+which lets you compare them by eye instead of knowing. Both now open on a blank
+world, with the country named in the prompt where it used to be lit up.
+
+**Clue** is the deliberate version of that, and every tap-through mode has one.
+Pressing it zooms the map to 3× and puts the country in frame but **off
+centre** — dead centre would be as good as naming it. The offset is derived from
+the country code, so asking twice moves the map to the same place rather than
+jittering.
+
+Two modes ask for something else and get it:
+
+- **Which continent?** lights the country up as well as framing it. The
+  highlight *is* the clue.
+- **Bigger or smaller / More people** draws both countries in the buttons'
+  colours and centres between them, without zooming. You cannot compare two
+  countries one at a time, so a 3× zoom on one of them would be no help.
+
+A clue lasts exactly one question. It is remembered as the move count it was
+asked at, so the next answer moves the count on and the map goes quiet again —
+otherwise one clue would light up the rest of the round.
 
 ## Learning as you go
 

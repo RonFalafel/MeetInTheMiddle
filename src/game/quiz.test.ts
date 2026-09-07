@@ -120,7 +120,7 @@ describe('bigger or smaller', () => {
     expect(compareScore(game).wrong[0]).toMatchObject({ given: 'DEU', answer: 'BRA' })
   })
 
-  it('shows the pair on the map, one in each colour', () => {
+  it('offers the pair for the map in the two buttons colours', () => {
     const game = compareGame('world', 'area', [['FRA', 'RUS']])
     expect([...claimedBy(game).entries()]).toEqual([
       ['FRA', 0],

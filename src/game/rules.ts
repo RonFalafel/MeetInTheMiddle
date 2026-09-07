@@ -271,7 +271,8 @@ export function claimedBy(state: GameState): Map<CountryCode, PlayerIndex> {
   if (state.mode === 'chain') claimed.set(state.start, 0)
 
   if (state.mode === 'compare') {
-    // Colour the pair to match the two buttons, so the map is the question.
+    // The pair in the two buttons' colours. The screen only draws this once a
+    // clue is asked for — seeing both countries is most of the answer.
     const pair = currentPair(state)
     if (pair) {
       claimed.set(pair[0], 0)

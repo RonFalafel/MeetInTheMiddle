@@ -351,3 +351,28 @@ Israel's, Germany's, India's?), and unlike population a wrong one is wrong
 forever rather than merely stale. Disproportionate for one mode. Landlocked,
 currency and language questions cover the same "fun country property" ground and
 come free with the data.
+
+## 2026-09-07 — the map was answering the question
+
+Reported from play: Which continent? lit the country up on the map, so you could
+see which continent it was on without knowing anything. Bigger or smaller drew
+both countries in the buttons' colours, so you could compare them by eye. Both
+modes were answerable without playing them.
+
+**The map is now a clue in both.** They open on a blank world; the country that
+used to be lit up is named in the prompt instead ("Which continent is Monaco
+on?"), and the pair that used to be coloured in is only painted once the clue is
+asked for.
+
+This is the same rule already applied to capitals and flags, extended to the two
+places it had been missed. The earlier reasoning — "both countries are named on
+the buttons, so the map cannot spoil anything" — was simply wrong: naming them
+is not the same as drawing them side by side at a glance.
+
+**A clue lasts one question.** It is stored as the move count it was asked at,
+so the next answer expires it. Without that, one clue would leave the map lit
+for the rest of the round and the mode would be back where it started.
+
+**The compare clue does not zoom.** Every other clue frames one country at 3×.
+You cannot compare two countries one at a time, so this one paints both and
+centres between them at the current scale instead.

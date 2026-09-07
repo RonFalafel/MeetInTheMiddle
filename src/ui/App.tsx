@@ -96,7 +96,17 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
   const { game, me } = session
   // Bumped rather than set, so asking for the same country twice still moves
   // the map — a clue you cannot repeat is a clue you can lose.
-  const [clue, setClue] = useState<{ code: CountryCode; nonce: number } | null>(null)
+  //
+  // `at` is the move count it was asked at, so a clue lasts exactly one
+  // question: the next answer moves the count on and the map goes quiet again.
+  // `code` is null where the clue is the map itself rather than a place to zoom
+  // to — Bigger or smaller needs both countries in view, not one of them close
+  // up.
+  const [clue, setClue] = useState<{
+    code: CountryCode | null
+    nonce: number
+    at: number
+  } | null>(null)
 
   if (!game) {
     return (
@@ -113,6 +123,8 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
   }
 
   const over = isOver(game)
+  // Whether the clue that was asked for is still the one on screen.
+  const clued = clue !== null && clue.at === movesMade(game)
   const other: PlayerIndex = me === 0 ? 1 : 0
   const hidePartner = game.mode === 'meet' && !SETTINGS.showPartnerCountries && !over
   const missed =
@@ -129,15 +141,17 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
       {session.roomCode && <RoomBar session={session} onLeave={onLeave} />}
 
       <WorldMap
-        claimed={claimedBy(game)}
+        // The pair in Bigger or smaller is a clue, not a given: seeing both
+        // countries drawn is most of the answer, so it waits to be asked for.
+        claimed={game.mode === 'compare' && !clued ? NOTHING_CLAIMED : claimedBy(game)}
         starts={game.mode === 'meet' ? game.starts : []}
         route={game.mode === 'meet' && over ? connectingRoute(game) : null}
         hiddenPlayer={hidePartner ? other : null}
-        focus={mapFocus(game, me)}
+        focus={mapFocus(game, me, clued)}
         missed={missed}
-        highlight={highlightFor(game, over)}
+        highlight={highlightFor(game, over, clued)}
         heat={game.mode === 'hot-cold' ? heatMap(game) : undefined}
-        clue={clue}
+        clue={clue?.code ? { code: clue.code, nonce: clue.nonce } : null}
       />
 
       {over ? (
@@ -146,7 +160,9 @@ function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
         <Play
           session={session}
           game={game}
-          onClue={(code) => setClue((current) => ({ code, nonce: (current?.nonce ?? 0) + 1 }))}
+          onClue={(code) =>
+            setClue((current) => ({ code, nonce: (current?.nonce ?? 0) + 1, at: movesMade(game) }))
+          }
         />
       )}
 
@@ -175,13 +191,21 @@ function heatMap(game: HotColdGame): ReadonlyMap<CountryCode, number> {
   return map
 }
 
+/** Passed when the map is deliberately showing nothing. Stable, so it does not
+ * re-render the map on every keystroke. */
+const NOTHING_CLAIMED: ReadonlyMap<CountryCode, PlayerIndex> = new Map()
+
 /**
  * The country drawn lit up. Only the shape prompt hides its identity — the
  * capitals prompt must not highlight, or the map would answer the question.
+ *
+ * Which continent? is the same trap and took longer to spot: lighting the
+ * country up shows you where it is, which is the entire question. It is now the
+ * clue, and the prompt names the country instead.
  */
-function highlightFor(game: GameState, over: boolean): CountryCode | null {
+function highlightFor(game: GameState, over: boolean, clued: boolean): CountryCode | null {
   if (game.mode === 'neighbours') return game.hub
-  if (game.mode === 'which-continent') return over ? null : currentCountry(game)
+  if (game.mode === 'which-continent') return over || !clued ? null : currentCountry(game)
   if (game.mode === 'identify' && game.prompt === 'shape' && !over) return currentTarget(game)
   return null
 }
@@ -195,14 +219,19 @@ function highlightFor(game: GameState, over: boolean): CountryCode | null {
  * flags and which-continent away outright. The clue button exists for when you
  * do want the map to help.
  */
-function mapFocus(game: GameState, me: PlayerIndex): readonly CountryCode[] {
+function mapFocus(
+  game: GameState,
+  me: PlayerIndex,
+  clued: boolean,
+): readonly CountryCode[] {
   if (game.mode === 'meet') return [game.starts[me]]
   if (game.mode === 'continent') return continentTargets(game)
   // The hub is named in the prompt, so framing it gives nothing away.
   if (game.mode === 'neighbours') return [game.hub]
   if (game.mode === 'chain') return [chainHead(game)]
-  // Both countries are named on the buttons, so the map cannot spoil anything.
-  if (game.mode === 'compare') return currentPair(game) ?? []
+  // Only once asked: both countries in frame is the clue. Centring rather than
+  // zooming, because you cannot compare two countries one at a time.
+  if (game.mode === 'compare') return clued ? (currentPair(game) ?? []) : []
   // Hot/cold, which-continent, and the capital and flag prompts all hide where
   // the country is, which is exactly what is being asked.
   if (game.mode === 'identify' && game.prompt === 'shape') {
@@ -343,12 +372,14 @@ function Play({
 }: {
   session: Session
   game: GameState
-  onClue: (code: CountryCode) => void
+  onClue: (code: CountryCode | null) => void
 }) {
   const { t, name } = useLanguage()
   const { me, setMe, guess, notice } = session
 
-  if (game.mode === 'compare') return <ComparePlay game={game} onPick={guess} />
+  if (game.mode === 'compare') {
+    return <ComparePlay game={game} onPick={guess} onClue={onClue} />
+  }
   if (game.mode === 'which-continent') {
     return <ContinentPlay game={game} onPick={guess} onClue={onClue} />
   }
@@ -613,7 +644,15 @@ function FlagPrompt({ game }: { game: IdentifyGame }) {
  * Two big buttons rather than the guess input: the answer is one of two things,
  * and typing a country name you can already see would be busywork.
  */
-function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: string) => void }) {
+function ComparePlay({
+  game,
+  onPick,
+  onClue,
+}: {
+  game: CompareGame
+  onPick: (code: string) => void
+  onClue: (code: CountryCode | null) => void
+}) {
   const { t, name } = useLanguage()
   const pair = currentPair(game)
   const score = compareScore(game)
@@ -636,6 +675,12 @@ function ComparePlay({ game, onPick }: { game: CompareGame; onPick: (code: strin
           </button>
         ))}
       </div>
+      {/* No country to zoom to: the clue is drawing both of them at once. */}
+      <div className="who">
+        <button type="button" className="chip" onClick={() => onClue(null)}>
+          {t.clue}
+        </button>
+      </div>
     </section>
   )
 }
@@ -650,14 +695,16 @@ function ContinentPlay({
   onPick: (code: string) => void
   onClue: (code: CountryCode) => void
 }) {
-  const { t } = useLanguage()
+  const { t, name } = useLanguage()
   const score = whichContinentScore(game)
   const target = currentCountry(game)
 
   return (
     <section className="panel">
       <p className="standing">
-        <strong>{t.whichContinentIs}</strong>
+        <strong>
+          {format(t.whichContinentIs, { country: target ? name(target) : '' })}
+        </strong>
         <em>
           {' · '}
           {score.asked + 1}/{score.total}
