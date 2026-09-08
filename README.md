@@ -57,8 +57,9 @@ npm run sync
 - **Name the neighbours** — one country is lit up; name everything bordering it.
 - **The long way round** — start somewhere and walk, border by border, as far as
   you can without repeating yourself.
-- **Hot and cold** — one secret country, and every guess is coloured by how
-  close it is, with bordering guesses called out. Globle, on our map.
+- **Hot and cold** — one secret country, and every guess is coloured on the map
+  by how close it is, on a thermal ramp from indigo through red to white-hot,
+  with bordering guesses called out. Globle, on our map.
 
 Tap the title to get back to this list. Rounds that move on regardless of your
 answer tell you what the answer was, and every one of them has a **Clue** button

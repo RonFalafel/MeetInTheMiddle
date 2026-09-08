@@ -8,6 +8,7 @@ import { getCountry } from '../game/graph.ts'
 import type { CountryCode } from '../game/types.ts'
 import type { PlayerIndex } from '../game/rules.ts'
 import { useZoomPan } from './useZoomPan.ts'
+import { heatColour } from './heatColour.ts'
 import { useLanguage } from './language.tsx'
 import { SETTINGS } from '../settings.ts'
 
@@ -68,23 +69,6 @@ const SHAPES: readonly Shape[] = (() => {
 const SHAPE_BY_CODE = new Map<CountryCode, Shape>()
 for (const shape of SHAPES) {
   if (shape.code && !SHAPE_BY_CODE.has(shape.code)) SHAPE_BY_CODE.set(shape.code, shape)
-}
-
-/**
- * One hue, varying intensity — Globle's scale rather than a rainbow.
- *
- * A blue-to-red ramp looked pretty but read wrong: on a dark map a cold blue
- * guess is barely distinguishable from unguessed land, so far guesses looked
- * like they had not registered. Every guess is now visibly red; how red is the
- * clue. Built here rather than in CSS because the value is continuous.
- *
- * The span is deliberately wide — lightness 28% to 58%, saturation 35% to 90% —
- * because a narrow one made every guess look alike, which was the complaint
- * that produced this version.
- */
-export function heatColour(heat: number): string {
-  const clamped = Math.min(1, Math.max(0, heat))
-  return `hsl(${22 - 22 * clamped} ${35 + 55 * clamped}% ${28 + 30 * clamped}%)`
 }
 
 const projectCentroid = (code: CountryCode): [number, number] | null => {
@@ -270,11 +254,24 @@ export function WorldMap({
           )}
 
           {/* Microstates are smaller than a pixel at this scale, so they get a dot. */}
-          {[...visible].map(([code, player]) =>
-            SHAPE_BY_CODE.get(code)?.tiny ? (
+          {[...visible].map(([code, player]) => {
+            if (!SHAPE_BY_CODE.get(code)?.tiny) return null
+            // Hot/cold claims every guess as well as heating it, so without
+            // this a guessed Monaco came back in a player colour and its
+            // distance was the one thing the map did not say.
+            const warmth = heat?.get(code)
+            return warmth === undefined ? (
               <Dot key={`tiny-${code}`} code={code} className={`tiny player-${player}`} r={crisp(3)} />
-            ) : null,
-          )}
+            ) : (
+              <Dot
+                key={`tiny-${code}`}
+                code={code}
+                className="tiny warm"
+                fill={heatColour(warmth)}
+                r={crisp(3)}
+              />
+            )
+          })}
 
           {/* A ring in the sea colour, so a start reads even on top of its own fill. */}
           {starts.map((code, player) =>
@@ -307,13 +304,25 @@ function Dot({
   className,
   r,
   strokeWidth,
+  fill,
 }: {
   code: CountryCode
   className: string
   r: number
   strokeWidth?: number
+  /** Inline, because a `fill` attribute would lose to the class rule. */
+  fill?: string
 }) {
   const point = projectCentroid(code)
   if (!point) return null
-  return <circle className={className} cx={point[0]} cy={point[1]} r={r} strokeWidth={strokeWidth} />
+  return (
+    <circle
+      className={className}
+      cx={point[0]}
+      cy={point[1]}
+      r={r}
+      strokeWidth={strokeWidth}
+      style={fill ? { fill } : undefined}
+    />
+  )
 }

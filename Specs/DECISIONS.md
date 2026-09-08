@@ -376,3 +376,43 @@ for the rest of the round and the mode would be back where it started.
 **The compare clue does not zoom.** Every other clue frames one country at 3×.
 You cannot compare two countries one at a time, so this one paints both and
 centres between them at the current scale instead.
+
+## 2026-09-08 — the heat ramp is a thermal ramp, not one hue
+
+Third report of "they all look the same", so the premise was wrong rather than
+the tuning.
+
+**One hue cannot do this.** Globle's single-hue scale works on a globe showing a
+handful of guesses; here twenty countries are on screen at once and several are
+small. Varying only lightness and saturation put Belgium (480 km) and Poland
+(1,370 km) eight points apart on the redmean ΔE approximation, and Norway
+(685 km) and Poland thirteen. That is not a tuning problem — it is the whole
+range a single hue has to offer at usable lightness on a dark map.
+
+**Hue is what the eye discriminates**, so the ramp now travels indigo → purple →
+fuchsia → pink → red → orange → amber → yellow → white-hot. Those same pairs are
+now 136 and 100 apart. It is the scale a thermal camera uses, for the same
+reason, and "redder is hotter" still holds across the middle where most guesses
+land — past red it goes orange and white-hot, which is what heat does.
+
+This does not reopen the 2026-08 decision against blue-to-red. That failed
+because a *dark, desaturated* cold end read as unguessed land; every stop here is
+strongly saturated and at least 90 ΔE from `--land`, which is asserted in a test.
+
+**The stops are crowded at the hot end on purpose.** Five of nine sit above 0.6
+heat — everything within ~4,000 km. Two guesses 9,000 km out only need to say
+"nowhere near"; two 700 km apart need to be told apart, because that is where the
+game is decided. The trade is deliberate and tested in both directions.
+
+**The ramp moved to its own file.** `src/ui/heatColour.ts` is pure and importable
+from a `.test.ts` without dragging in React and the world-atlas topology. It is
+the third rewrite of this function, and the reason each previous one shipped
+broken is that nothing asserted on it. Now `heatColour.test.ts` does, in ΔE,
+including against the land colour. It also removed an oxlint fast-refresh
+warning on WorldMap.tsx.
+
+**A guessed microstate was drawn in a player colour.** Hot/cold claims every
+guess as well as heating it, and the microstate dots — drawn separately, because
+Monaco is smaller than a pixel at this scale — read `claimed` rather than `heat`.
+So guessing Singapore returned a teal dot and told you nothing. They take the
+heat fill now.

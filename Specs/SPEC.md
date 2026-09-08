@@ -227,20 +227,13 @@ is, and **a guess that borders the answer says so** — in the prompt and agains
 that row in the list. Islands are perfectly good secrets here, because distance
 does not care about land routes.
 
-The scale is one hue with varying intensity, the way Globle does it. A
-blue-to-red ramp was tried first and read wrong: on a dark map a cold blue
-guess is barely distinguishable from unguessed land, so far guesses looked like
-they had not registered. Every guess is now visibly red; how red is the clue.
+### Heat
 
-Heat is `1 - (distance / 20,000 km) ^ 0.6`. The exponent is doing real work: an
+Distance is great-circle between centroids, and heat is
+`1 - (distance / 20,000 km) ^ 0.6`. The exponent is doing real work: an
 exponential decay collapses everything past a few thousand kilometres into one
-shade, and a linear ramp flattens the near end instead. A root curve spreads
-both, so every distance band gets its own visible step.
-
-Distance is great-circle between centroids, and the colour falls off
-exponentially with a 3,000 km scale. A linear ramp leaves the whole of Europe
-within one shade of itself; this way a neighbour reads around 0.85, the far side
-of a continent around 0.5, and another continent below 0.1.
+value, and a linear ramp flattens the near end instead. A root curve spreads
+both.
 
 | From France | | heat |
 | --- | --- | --- |
@@ -250,6 +243,32 @@ of a continent around 0.5, and another continent below 0.1.
 | United States | 7,644 km | 0.44 |
 | Australia | 15,192 km | 0.15 |
 | New Zealand | 19,044 km | 0.03 |
+
+### Colour
+
+A **thermal ramp**, in [`src/ui/heatColour.ts`](../src/ui/heatColour.ts):
+indigo, purple, fuchsia, pink, red, orange, amber, yellow, white-hot.
+
+It got there the long way. Blue-to-red was tried first and read wrong — on a
+dark map a cold blue guess was hard to tell from unguessed land, so far guesses
+looked like they had not registered. The fix was a single red hue with lightness
+and saturation doing the work, Globle-style, and that was reported as
+indistinguishable **twice**, because it was: Belgium at 480 km and Poland at
+1,370 km came out eight points apart on ΔE, which is invisible on a country the
+size of Belgium.
+
+Hue is what the eye actually discriminates. The same two guesses are now 136
+apart. Nothing on the ramp resembles `--land` (`#2b3543`, dark and desaturated),
+so the original complaint stays fixed.
+
+**The stops are deliberately crowded at the hot end.** Five of the nine sit
+above 0.6, which is everything within about 4,000 km — where a game is actually
+won. The far half only has to read as "nowhere near"; the list gives exact
+kilometres for anyone who wants them. Consequently two guesses 9,000 km out may
+look alike, and two 700 km apart never will.
+
+`heatColour.test.ts` asserts all of this in ΔE, so it cannot quietly regress a
+third time.
 
 ## What the map may give away
 
